@@ -1,15 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { X, Key, Sparkles, PlusCircle, CheckCircle, Wifi, Share2, Globe, Users, Copy, Activity, AlertCircle, RefreshCw, Terminal, Check } from 'lucide-react';
 
+interface GeminiModelInfo {
+  name: string;
+  displayName: string;
+  description: string;
+  supportedGenerationMethods?: string[];
+}
+
 export const SettingsModal: React.FC = () => {
   const { isSettingsOpen, setIsSettingsOpen, settings, updateSettings, topUpCredits, isConnected } = useApp();
+  
+  // ALL React Hooks at the very top (never after conditional return)
   const [apiKeyInput, setApiKeyInput] = useState(settings.geminiApiKey || '');
   const [selectedModel, setSelectedModel] = useState(settings.geminiModel || 'gemini-1.5-flash');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeModalTab, setActiveModalTab] = useState<'network' | 'ai' | 'debug'>('ai');
   const [copiedLink, setCopiedLink] = useState(false);
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+  const [modelsList, setModelsList] = useState<GeminiModelInfo[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [listModelsError, setListModelsError] = useState<string | null>(null);
 
   // Debugger state
   const [isTesting, setIsTesting] = useState(false);
@@ -24,6 +37,17 @@ export const SettingsModal: React.FC = () => {
     help?: string;
   }>({ tested: false });
 
+  // Sync state if settings update
+  useEffect(() => {
+    if (settings.geminiApiKey && !apiKeyInput) {
+      setApiKeyInput(settings.geminiApiKey);
+    }
+    if (settings.geminiModel) {
+      setSelectedModel(settings.geminiModel);
+    }
+  }, [settings.geminiApiKey, settings.geminiModel]);
+
+  // Conditional early return AFTER all hooks
   if (!isSettingsOpen) return null;
 
   const handleSaveSettings = async () => {
@@ -34,17 +58,6 @@ export const SettingsModal: React.FC = () => {
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
-
-  interface GeminiModelInfo {
-    name: string;
-    displayName: string;
-    description: string;
-    supportedGenerationMethods?: string[];
-  }
-
-  const [modelsList, setModelsList] = useState<GeminiModelInfo[]>([]);
-  const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [listModelsError, setListModelsError] = useState<string | null>(null);
 
   // Function to call ModelService.ListModels directly from Google AI Studio
   const handleFetchAvailableModels = async () => {
@@ -200,8 +213,8 @@ export const SettingsModal: React.FC = () => {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
       <div className="glass-panel-elevated rounded-3xl max-w-xl w-full p-6 lg:p-7 space-y-5 shadow-2xl relative border border-white max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
@@ -597,4 +610,6 @@ export const SettingsModal: React.FC = () => {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? ReactDOM.createPortal(modalContent, document.body) : null;
 };
