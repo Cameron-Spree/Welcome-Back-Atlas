@@ -25,6 +25,8 @@ interface AppContextType {
   updateDoc: (doc: LearnDoc) => Promise<void>;
   generateAiDoc: (taskId: string) => Promise<void>;
   generateAiRoadmap: (prompt: string) => Promise<void>;
+  generatePlanWithGuides: (prompt: string) => Promise<{ tasks: Task[]; docs: LearnDoc[] }>;
+  commitPlan: (tasks: Task[], docs: LearnDoc[]) => Promise<void>;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   topUpCredits: (amount: number) => Promise<void>;
   isConnected: boolean;
@@ -232,10 +234,43 @@ function normalizeActivity(raw: any): ActivityFeedItem {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserRole>('Cam');
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [docs, setDocs] = useState<LearnDoc[]>(INITIAL_DOCS);
+
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    try {
+      const saved = localStorage.getItem('atlas_tasks');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_TASKS;
+  });
+
+  const [docs, setDocs] = useState<LearnDoc[]>(() => {
+    try {
+      const saved = localStorage.getItem('atlas_docs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_DOCS;
+  });
+
   const [activities, setActivities] = useState<ActivityFeedItem[]>(INITIAL_ACTIVITIES);
-  const [settings, setSettings] = useState<AppSettings>({ geminiApiKey: '', aiCredits: 100, theme: 'light' });
+
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    try {
+      const saved = localStorage.getItem('atlas_app_settings');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+    const savedKey = typeof window !== 'undefined' ? localStorage.getItem('atlas_gemini_api_key') || '' : '';
+    const savedModel = typeof window !== 'undefined' ? localStorage.getItem('atlas_gemini_model') || 'gemini-flash-latest' : 'gemini-flash-latest';
+    return { geminiApiKey: savedKey, geminiModel: savedModel, aiCredits: 100, theme: 'light' };
+  });
+
   const [activeTab, setActiveTab] = useState<'home' | 'learn' | 'projects' | 'progress'>('home');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
@@ -255,13 +290,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (tasksRes.ok) {
         const data = await tasksRes.json();
         if (Array.isArray(data) && data.length > 0) {
-          setTasks(data.map(normalizeTask));
+          const norm = data.map(normalizeTask);
+          setTasks(norm);
+          try { localStorage.setItem('atlas_tasks', JSON.stringify(norm)); } catch {}
         }
       }
       if (docsRes.ok) {
         const data = await docsRes.json();
         if (Array.isArray(data) && data.length > 0) {
-          setDocs(data.map(normalizeDoc));
+          const norm = data.map(normalizeDoc);
+          setDocs(norm);
+          try { localStorage.setItem('atlas_docs', JSON.stringify(norm)); } catch {}
         }
       }
       if (actRes.ok) {
@@ -272,7 +311,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       if (setRes.ok) {
         const data = await setRes.json();
-        setSettings((prev) => ({ ...prev, ...data }));
+        setSettings((prev) => {
+          const updated = { ...prev, ...data };
+          try { localStorage.setItem('atlas_app_settings', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
       }
     } catch {
       // Offline fallback
@@ -686,9 +729,293 @@ Respond with a JSON array of objects with the exact schema:
     }
   };
 
+  const generatePlanWithGuides = async (
+    prompt: string
+  ): Promise<{ tasks: Task[]; docs: LearnDoc[] }> => {
+    const baseDate = new Date();
+    const apiKey = (settings.geminiApiKey || '').trim();
+    const model = settings.geminiModel || 'gemini-flash-latest';
+
+    let generatedPhases: any[] = [];
+
+    if (apiKey) {
+      const candidateModels = Array.from(
+        new Set([
+          model,
+          'gemini-flash-latest',
+          'gemini-2.0-flash',
+          'gemini-2.0-flash-exp',
+          'gemini-1.5-flash-latest',
+          'gemini-1.5-flash',
+          'gemini-pro',
+        ])
+      );
+
+      for (const testMod of candidateModels) {
+        try {
+          const endpoints = [
+            `https://generativelanguage.googleapis.com/v1beta/models/${testMod}:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1/models/${testMod}:generateContent?key=${apiKey}`,
+          ];
+
+          for (const ep of endpoints) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const res = await fetch(ep, {
+              method: 'POST',
+              signal: controller.signal,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: `You are an expert technical product manager. Decompose project goal: "${prompt}" into 3 sequential phases for team members Cam (Backend/Architecture), Liam (Frontend/UI), and Alex (Design/QA/Strategy).
+For EACH phase, also provide curated learning literature and guides so the assigned person knows what to do and read up on.
+
+Respond with a JSON array of objects with the exact schema:
+[
+  {
+    "title": "Phase title",
+    "description": "Deliverable description",
+    "assignee": "Cam" | "Liam" | "Alex",
+    "startOffsetDays": 0,
+    "durationDays": 4,
+    "priority": "High" | "Medium" | "Low",
+    "subtasks": ["Deliverable 1", "Deliverable 2"],
+    "literature": {
+      "guideTitle": "Guide title for assigned person",
+      "summary": "Why this literature is essential for this task",
+      "markdownContent": "# Title\\n\\n## Architecture & Strategy\\nDetailed explanation...\\n\\n### Key Steps\\n1. Step 1\\n2. Step 2",
+      "resources": [
+        { "title": "Reference Doc / Article", "url": "https://developer.mozilla.org", "type": "doc" }
+      ]
+    }
+  }
+]`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  temperature: 0.3,
+                  responseMimeType: 'application/json',
+                },
+              }),
+            });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+              const data = await res.json();
+              const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (jsonText) {
+                const parsed = JSON.parse(jsonText);
+                const list = Array.isArray(parsed) ? parsed : parsed.tasks || [];
+                if (list.length > 0) {
+                  generatedPhases = list;
+                  break;
+                }
+              }
+            }
+          }
+          if (generatedPhases.length > 0) break;
+        } catch (err) {
+          console.warn('[AppContext] Gemini plan generation attempt failed:', err);
+        }
+      }
+    }
+
+    // High quality contextual fallback
+    if (generatedPhases.length === 0) {
+      generatedPhases = [
+        {
+          title: `Architecture & Data Pipeline: ${prompt.slice(0, 24)}`,
+          description: `Design backend models, APIs, and real-time multiplayer schema for: ${prompt}`,
+          assignee: 'Cam',
+          startOffsetDays: 0,
+          durationDays: 4,
+          priority: 'High',
+          subtasks: ['Define API contracts and WebSocket channels', 'Configure SQLite models and caching layer'],
+          literature: {
+            guideTitle: `Backend & API Architecture for ${prompt.slice(0, 20)}`,
+            summary: `Comprehensive architectural guide for Cam to build scalable backend services.`,
+            markdownContent: `# Backend Architecture & APIs: ${prompt}\n\n## Overview\nThis guide establishes the data contracts, rate limits, and persistence strategy for **${prompt}**.\n\n### 1. Data Models\n- Define schemas with strict validation.\n- Set up idempotent endpoints.\n\n### 2. Best Practices\n- Implement automated retries and latency monitoring.\n- Structure WebSocket event channels for collaborative sync.`,
+            resources: [
+              { title: 'Modern API Architecture Guide', url: 'https://socket.io/docs/v4/', type: 'doc' },
+              { title: 'Designing High-Throughput Pipelines', url: 'https://developer.mozilla.org', type: 'article' },
+            ],
+          },
+        },
+        {
+          title: `Interactive Workspace & UI: ${prompt.slice(0, 24)}`,
+          description: `Build responsive Apple-style calendar and interactive interface for: ${prompt}`,
+          assignee: 'Liam',
+          startOffsetDays: 1,
+          durationDays: 5,
+          priority: 'Medium',
+          subtasks: ['Build interactive Gantt calendar timeline', 'Implement fluid micro-interactions and status toggles'],
+          literature: {
+            guideTitle: `Frontend UI & Interaction Patterns for ${prompt.slice(0, 20)}`,
+            summary: `UI/UX development playbook for Liam to build fluid Apple-glass interfaces.`,
+            markdownContent: `# Frontend Engineering Playbook: ${prompt}\n\n## Overview\nUI patterns and state management techniques for **${prompt}**.\n\n### Core Patterns\n- Use optimistic UI updates for instant response.\n- Glassmorphic translucent layers with specular borders.\n\n### Component Checklist\n- [ ] Day-by-day Gantt timeline grid\n- [ ] Drag-and-drop status transition cards`,
+            resources: [
+              { title: 'Tailwind CSS Glassmorphism Principles', url: 'https://tailwindcss.com', type: 'doc' },
+              { title: 'React Performance & Optimistic UI', url: 'https://react.dev', type: 'article' },
+            ],
+          },
+        },
+        {
+          title: `Design Tokens & QA Strategy: ${prompt.slice(0, 24)}`,
+          description: `Create design assets, polish visual specular effects, and write test scenarios for: ${prompt}`,
+          assignee: 'Alex',
+          startOffsetDays: 3,
+          durationDays: 6,
+          priority: 'Medium',
+          subtasks: ['Design high-fidelity icons and color tokens', 'Run cross-browser test suite and edge-case verification'],
+          literature: {
+            guideTitle: `Design System & QA Strategy for ${prompt.slice(0, 20)}`,
+            summary: `Design tokens and QA validation matrix for Alex.`,
+            markdownContent: `# Design System & Verification Matrix: ${prompt}\n\n## Overview\nVisual standards, typography balance, and QA acceptance tests for **${prompt}**.\n\n### Key Deliverables\n1. Review color contrast on frosted glass cards.\n2. Verify cross-platform responsiveness on mobile and desktop.\n3. Validate edge cases and error states.`,
+            resources: [
+              { title: 'Apple Human Interface Guidelines', url: 'https://developer.apple.com/design/', type: 'doc' },
+              { title: 'Comprehensive Web Accessibility Checklist', url: 'https://w3.org/WAI/', type: 'article' },
+            ],
+          },
+        },
+      ];
+    }
+
+    const tasksList: Task[] = [];
+    const docsList: LearnDoc[] = [];
+
+    generatedPhases.forEach((phase: any, i: number) => {
+      const taskId = `task-gemini-${Date.now()}-${i}`;
+      const docId = `doc-gemini-${Date.now()}-${i}`;
+
+      const startOffset = phase.startOffsetDays !== undefined ? Number(phase.startOffsetDays) : i * 2;
+      const duration = phase.durationDays !== undefined ? Math.max(2, Number(phase.durationDays)) : 4;
+      const startDate = format(addDays(baseDate, startOffset), 'yyyy-MM-dd');
+      const endDate = format(addDays(baseDate, startOffset + duration), 'yyyy-MM-dd');
+
+      const assignee: UserRole =
+        phase.assignee === 'Liam' || phase.assignee === 'Alex' || phase.assignee === 'Cam'
+          ? phase.assignee
+          : i % 3 === 0
+          ? 'Cam'
+          : i % 3 === 1
+          ? 'Liam'
+          : 'Alex';
+
+      const subtasks = Array.isArray(phase.subtasks)
+        ? phase.subtasks.map((st: any, sIdx: number) => ({
+            id: `sub-ai-${Date.now()}-${sIdx}`,
+            title: typeof st === 'string' ? st : st.title || 'Deliverable',
+            completed: false,
+          }))
+        : [];
+
+      const task: Task = {
+        id: taskId,
+        title: phase.title || `Phase ${i + 1}`,
+        description: phase.description || `Deliverables for ${prompt}`,
+        assignee,
+        status: i === 0 ? 'In Progress' : 'Backlog',
+        priority: phase.priority || 'Medium',
+        startDate,
+        endDate,
+        progress: i === 0 ? 20 : 0,
+        tags: ['gemini-ai', prompt.slice(0, 12)],
+        docId,
+        subtasks,
+      };
+
+      const lit = phase.literature || {};
+      const doc: LearnDoc = {
+        id: docId,
+        title: lit.guideTitle || `Learning Guide: ${task.title}`,
+        taskId: taskId,
+        taskTitle: task.title,
+        assignee: assignee,
+        relevanceExplanation: lit.summary || `Literature and guide prepared for ${assignee} to execute ${task.title}.`,
+        content: lit.markdownContent || `# ${task.title}\n\n## Overview\n${task.description}\n\n### Recommended Reading\nReview standard architecture documents and best practices.`,
+        resources: Array.isArray(lit.resources) && lit.resources.length > 0
+          ? lit.resources
+          : [
+              { title: `${task.title} Literature Reference`, url: 'https://socket.io', type: 'doc' },
+              { title: 'Best Practices Guide', url: 'https://developer.mozilla.org', type: 'article' },
+            ],
+        completed: false,
+      };
+
+      tasksList.push(task);
+      docsList.push(doc);
+    });
+
+    return { tasks: tasksList, docs: docsList };
+  };
+
+  const commitPlan = async (newTasks: Task[], newDocs: LearnDoc[]) => {
+    setTasks((prev) => {
+      const updated = [...prev, ...newTasks];
+      try { localStorage.setItem('atlas_tasks', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    setDocs((prev) => {
+      const updated = [...prev, ...newDocs];
+      try { localStorage.setItem('atlas_docs', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    setSettings((prev) => {
+      const updated = { ...prev, aiCredits: Math.max(0, prev.aiCredits - 15) };
+      try { localStorage.setItem('atlas_app_settings', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    for (const t of newTasks) {
+      if (socketInstance && socketInstance.connected) {
+        socketInstance.emit('task:create', { task: t, userId: currentUser });
+      }
+      try {
+        await fetch(`${API_BASE}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...t, user: currentUser }),
+        });
+      } catch {}
+    }
+
+    for (const d of newDocs) {
+      try {
+        await fetch(`${API_BASE}/docs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: d.id,
+            title: d.title,
+            subtitle: d.taskTitle,
+            linked_task_id: d.taskId,
+            markdown_content: d.content,
+            ai_relevance_summary: d.relevanceExplanation,
+            userId: currentUser,
+          }),
+        });
+      } catch {}
+    }
+  };
+
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     const updated = { ...settings, ...newSettings };
     setSettings(updated);
+    try {
+      localStorage.setItem('atlas_app_settings', JSON.stringify(updated));
+      if (updated.geminiApiKey) localStorage.setItem('atlas_gemini_api_key', updated.geminiApiKey);
+      if (updated.geminiModel) localStorage.setItem('atlas_gemini_model', updated.geminiModel);
+    } catch {}
+
     try {
       await fetch(`${API_BASE}/settings`, {
         method: 'PUT',
@@ -728,6 +1055,8 @@ Respond with a JSON array of objects with the exact schema:
         updateDoc,
         generateAiDoc,
         generateAiRoadmap,
+        generatePlanWithGuides,
+        commitPlan,
         updateSettings,
         topUpCredits,
         isConnected,
