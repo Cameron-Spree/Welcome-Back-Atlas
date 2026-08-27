@@ -32,6 +32,7 @@ export const HomeView: React.FC = () => {
     chatMessages,
     sendChatMessage,
     clearChatHistory,
+    updatePlanInMessage,
   } = useApp();
 
   const [inputPrompt, setInputPrompt] = useState('');
@@ -254,58 +255,208 @@ export const HomeView: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Phase Cards */}
+                        {/* Phase Cards (Editable in Draft mode) */}
                         <div className="space-y-3">
                           {msg.plan.tasks.map((task, pIdx) => {
                             const doc = msg.plan?.docs[pIdx];
                             return (
                               <div
                                 key={task.id}
-                                className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-2xs space-y-2.5"
+                                className="bg-white rounded-2xl p-4 border border-zinc-200/90 shadow-2xs space-y-3 relative group"
                               >
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                                  <div className="flex items-center space-x-2">
-                                    <span
-                                      className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${
-                                        task.assignee === 'Cam'
-                                          ? 'bg-black'
-                                          : task.assignee === 'Liam'
-                                          ? 'bg-zinc-800'
-                                          : 'bg-zinc-700'
-                                      }`}
-                                    >
-                                      {task.assignee}
-                                    </span>
-                                    <h4 className="text-xs sm:text-sm font-black text-zinc-950">
-                                      {task.title}
-                                    </h4>
+                                {/* Header: Assignee Switcher, Title, Dates, and Delete Phase */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                  <div className="flex items-center space-x-2 flex-1">
+                                    {/* Quick Assignee Switcher */}
+                                    {!isCommitted ? (
+                                      <select
+                                        value={task.assignee}
+                                        onChange={(e) => {
+                                          const newTasks = [...msg.plan!.tasks];
+                                          newTasks[pIdx] = { ...newTasks[pIdx], assignee: e.target.value as UserRole };
+                                          updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                        }}
+                                        className="bg-black text-white font-black text-[10px] px-2 py-1 rounded-md outline-none cursor-pointer hover:bg-zinc-800 transition"
+                                      >
+                                        <option value="Cam">Cam</option>
+                                        <option value="Liam">Liam</option>
+                                        <option value="Alex">Alex</option>
+                                      </select>
+                                    ) : (
+                                      <span
+                                        className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${
+                                          task.assignee === 'Cam'
+                                            ? 'bg-black'
+                                            : task.assignee === 'Liam'
+                                            ? 'bg-zinc-800'
+                                            : 'bg-zinc-700'
+                                        }`}
+                                      >
+                                        {task.assignee}
+                                      </span>
+                                    )}
+
+                                    {/* Editable Phase Title */}
+                                    {!isCommitted ? (
+                                      <input
+                                        type="text"
+                                        value={task.title}
+                                        onChange={(e) => {
+                                          const newTasks = [...msg.plan!.tasks];
+                                          newTasks[pIdx] = { ...newTasks[pIdx], title: e.target.value };
+                                          updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                        }}
+                                        className="text-xs sm:text-sm font-black text-zinc-950 bg-transparent hover:bg-zinc-50 focus:bg-white border border-transparent focus:border-zinc-300 rounded px-1.5 py-0.5 flex-1 focus:outline-none"
+                                      />
+                                    ) : (
+                                      <h4 className="text-xs sm:text-sm font-black text-zinc-950">
+                                        {task.title}
+                                      </h4>
+                                    )}
                                   </div>
 
-                                  <span className="text-[11px] text-zinc-400 font-mono font-medium">
-                                    {task.startDate} &rarr; {task.endDate}
-                                  </span>
+                                  <div className="flex items-center space-x-2">
+                                    {/* Date Range */}
+                                    {!isCommitted ? (
+                                      <div className="flex items-center space-x-1 text-[11px] font-mono text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg border border-zinc-200">
+                                        <input
+                                          type="date"
+                                          value={task.startDate}
+                                          onChange={(e) => {
+                                            const newTasks = [...msg.plan!.tasks];
+                                            newTasks[pIdx] = { ...newTasks[pIdx], startDate: e.target.value };
+                                            updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                          }}
+                                          className="bg-transparent text-zinc-800 font-mono text-[10px] focus:outline-none"
+                                        />
+                                        <span>&rarr;</span>
+                                        <input
+                                          type="date"
+                                          value={task.endDate}
+                                          onChange={(e) => {
+                                            const newTasks = [...msg.plan!.tasks];
+                                            newTasks[pIdx] = { ...newTasks[pIdx], endDate: e.target.value };
+                                            updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                          }}
+                                          className="bg-transparent text-zinc-800 font-mono text-[10px] focus:outline-none"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <span className="text-[11px] text-zinc-400 font-mono font-medium">
+                                        {task.startDate} &rarr; {task.endDate}
+                                      </span>
+                                    )}
+
+                                    {/* Delete Phase Button */}
+                                    {!isCommitted && (
+                                      <button
+                                        onClick={() => {
+                                          const newTasks = msg.plan!.tasks.filter((_, i) => i !== pIdx);
+                                          const newDocs = msg.plan!.docs.filter((_, i) => i !== pIdx);
+                                          updatePlanInMessage(msg.id, newTasks, newDocs);
+                                        }}
+                                        className="text-zinc-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition"
+                                        title="Delete Phase"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5 rotate-45" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
 
-                                <p className="text-xs text-zinc-600 font-normal">
-                                  {task.description}
-                                </p>
+                                {/* Editable Description */}
+                                {!isCommitted ? (
+                                  <textarea
+                                    value={task.description}
+                                    onChange={(e) => {
+                                      const newTasks = [...msg.plan!.tasks];
+                                      newTasks[pIdx] = { ...newTasks[pIdx], description: e.target.value };
+                                      updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                    }}
+                                    rows={2}
+                                    className="w-full text-xs text-zinc-700 bg-zinc-50/70 hover:bg-zinc-50 focus:bg-white border border-transparent focus:border-zinc-300 rounded-lg p-1.5 focus:outline-none font-normal"
+                                  />
+                                ) : (
+                                  <p className="text-xs text-zinc-600 font-normal">
+                                    {task.description}
+                                  </p>
+                                )}
 
                                 {/* Deliverables Subtask Checklist */}
-                                {task.subtasks && task.subtasks.length > 0 && (
-                                  <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100 space-y-1">
+                                <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100 space-y-1.5">
+                                  <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">
                                       Key Deliverables:
                                     </span>
-                                    <ul className="text-xs text-zinc-800 space-y-1 pl-1">
-                                      {task.subtasks.map((st) => (
-                                        <li key={st.id} className="flex items-center space-x-2">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                          <span>{st.title}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
                                   </div>
-                                )}
+
+                                  <ul className="text-xs text-zinc-800 space-y-1 pl-1">
+                                    {(task.subtasks || []).map((st, sIdx) => (
+                                      <li key={st.id || sIdx} className="flex items-center justify-between group/sub">
+                                        <div className="flex items-center space-x-2 flex-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
+                                          {!isCommitted ? (
+                                            <input
+                                              type="text"
+                                              value={st.title}
+                                              onChange={(e) => {
+                                                const newTasks = [...msg.plan!.tasks];
+                                                const newSubtasks = [...(newTasks[pIdx].subtasks || [])];
+                                                newSubtasks[sIdx] = { ...newSubtasks[sIdx], title: e.target.value };
+                                                newTasks[pIdx] = { ...newTasks[pIdx], subtasks: newSubtasks };
+                                                updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                              }}
+                                              className="text-xs text-zinc-800 bg-transparent hover:bg-white focus:bg-white rounded px-1 flex-1 focus:outline-none"
+                                            />
+                                          ) : (
+                                            <span>{st.title}</span>
+                                          )}
+                                        </div>
+
+                                        {!isCommitted && (
+                                          <button
+                                            onClick={() => {
+                                              const newTasks = [...msg.plan!.tasks];
+                                              const newSubtasks = (newTasks[pIdx].subtasks || []).filter((_, i) => i !== sIdx);
+                                              newTasks[pIdx] = { ...newTasks[pIdx], subtasks: newSubtasks };
+                                              updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                            }}
+                                            className="text-zinc-400 hover:text-red-500 opacity-0 group-hover/sub:opacity-100 transition px-1 text-xs"
+                                            title="Remove Deliverable"
+                                          >
+                                            &times;
+                                          </button>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+
+                                  {/* Add Deliverable Button */}
+                                  {!isCommitted && (
+                                    <button
+                                      onClick={() => {
+                                        const newTasks = [...msg.plan!.tasks];
+                                        const curSubtasks = newTasks[pIdx].subtasks || [];
+                                        newTasks[pIdx] = {
+                                          ...newTasks[pIdx],
+                                          subtasks: [
+                                            ...curSubtasks,
+                                            {
+                                              id: `st-${Date.now()}-${curSubtasks.length}`,
+                                              title: 'New key deliverable...',
+                                              completed: false,
+                                            },
+                                          ],
+                                        };
+                                        updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                                      }}
+                                      className="text-[11px] font-bold text-zinc-600 hover:text-black flex items-center space-x-1 pt-1 transition"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      <span>Add deliverable</span>
+                                    </button>
+                                  )}
+                                </div>
 
                                 {/* Attached Learning Literature Guide Card */}
                                 {doc && (
@@ -336,6 +487,35 @@ export const HomeView: React.FC = () => {
                               </div>
                             );
                           })}
+
+                          {/* Add Custom Phase Button */}
+                          {!isCommitted && (
+                            <button
+                              onClick={() => {
+                                const newTasks = [
+                                  ...msg.plan!.tasks,
+                                  {
+                                    id: `plan-task-custom-${Date.now()}`,
+                                    title: 'New Phase',
+                                    description: 'Describe the deliverables and goals for this phase.',
+                                    assignee: 'Cam' as UserRole,
+                                    startDate: new Date().toISOString().split('T')[0],
+                                    endDate: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+                                    status: 'Backlog' as const,
+                                    priority: 'Medium' as const,
+                                    progress: 0,
+                                    tags: ['Custom'],
+                                    subtasks: [{ id: `st-${Date.now()}-0`, title: 'First deliverable', completed: false }],
+                                  },
+                                ];
+                                updatePlanInMessage(msg.id, newTasks, msg.plan!.docs);
+                              }}
+                              className="w-full py-2.5 border-2 border-dashed border-zinc-200 hover:border-black rounded-2xl text-xs font-bold text-zinc-600 hover:text-black bg-white/50 hover:bg-white transition flex items-center justify-center space-x-1.5"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Add New Phase Card</span>
+                            </button>
+                          )}
                         </div>
 
                         {/* Action Bar */}

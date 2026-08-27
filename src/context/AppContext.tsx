@@ -57,6 +57,7 @@ interface AppContextType {
   chatMessages: ChatMessage[];
   sendChatMessage: (text: string) => Promise<void>;
   clearChatHistory: () => void;
+  updatePlanInMessage: (msgId: string, updatedTasks: Task[], updatedDocs?: LearnDoc[]) => void;
   companyProfile: CompanyProfile;
   updateCompanyProfile: (profile: Partial<CompanyProfile>) => void;
 }
@@ -821,8 +822,16 @@ Respond with a JSON array of objects with the exact schema:
                     role: 'user',
                     parts: [
                       {
-                        text: `You are an expert technical product manager. Decompose project goal: "${prompt}" into 3 sequential phases for team members Cam (Backend/Architecture), Liam (Frontend/UI), and Alex (Design/QA/Strategy).
-For EACH phase, also provide curated learning literature and guides so the assigned person knows what to do and read up on.
+                        text: `You are an expert strategist and technical product lead for Atlas Studios UK.
+Decompose the project goal: "${prompt}" into 3 or 4 sequential, highly actionable phases for team members Cam (Backend & Architecture), Liam (Frontend & Mobile Apps), and Alex (Design Director & Brand/QA).
+
+CRITICAL INSTRUCTIONS:
+1. DOMAIN ACCURACY: If the goal is about social media, branding, marketing, content creation, or business operations, DO NOT invent complex database/software builds unless the user specifically asked for custom software. Instead, assign genuine marketing/brand execution:
+   - Alex (Design/Brand): Visual templates in Figma, brand voice & tone guidelines, video showcase clips, content calendar cadence.
+   - Cam (Tech/Lead): Social media automated scheduling tooling (Buffer/Typefully/APIs), analytics metrics, technical engineering blog writeups.
+   - Liam (Frontend/Apps): Interactive product demos, interactive web showcases of Atlas Tools/apps (Veritas, Little Linguist), case study launch pages.
+2. TIMELINE: Start each phase sequentially (offset 0, offset +4, etc.), assigning priority and concise key deliverables.
+3. LEARNING GUIDES: For EACH phase, provide curated literature and guides so the assigned person knows what to do and read up on.
 
 Respond with a JSON array of objects with the exact schema:
 [
@@ -837,7 +846,7 @@ Respond with a JSON array of objects with the exact schema:
     "literature": {
       "guideTitle": "Guide title for assigned person",
       "summary": "Why this literature is essential for this task",
-      "markdownContent": "# Title\\n\\n## Architecture & Strategy\\nDetailed explanation...\\n\\n### Key Steps\\n1. Step 1\\n2. Step 2",
+      "markdownContent": "# Title\\n\\n## Overview & Execution Strategy\\nDetailed explanation...\\n\\n### Key Steps\\n1. Step 1\\n2. Step 2",
       "resources": [
         { "title": "Reference Doc / Article", "url": "https://developer.mozilla.org", "type": "doc" }
       ]
@@ -1151,6 +1160,26 @@ Respond with a JSON array of objects with the exact schema:
     }
   };
 
+  const updatePlanInMessage = (msgId: string, updatedTasks: Task[], updatedDocs?: LearnDoc[]) => {
+    const updated = chatMessages.map((msg) => {
+      if (msg.id === msgId && msg.plan) {
+        return {
+          ...msg,
+          plan: {
+            ...msg.plan,
+            tasks: updatedTasks,
+            docs: updatedDocs || msg.plan.docs,
+          },
+        };
+      }
+      return msg;
+    });
+    setChatMessages(updated);
+    try {
+      localStorage.setItem('atlas_chat_messages', JSON.stringify(updated));
+    } catch {}
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1184,6 +1213,7 @@ Respond with a JSON array of objects with the exact schema:
         chatMessages,
         sendChatMessage,
         clearChatHistory,
+        updatePlanInMessage,
         companyProfile,
         updateCompanyProfile,
       }}
