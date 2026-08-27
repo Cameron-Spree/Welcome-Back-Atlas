@@ -205,29 +205,29 @@ export const SettingsModal: React.FC = () => {
       <div className="glass-panel-elevated rounded-3xl max-w-xl w-full p-6 lg:p-7 space-y-5 shadow-2xl relative border border-white max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200/70 pb-3.5">
+        <div className="flex items-center justify-between border-b border-zinc-200/80 pb-3.5">
           <div className="flex items-center space-x-2">
-            <span className="p-1.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+            <span className="p-1.5 rounded-xl bg-zinc-100 text-zinc-900 border border-zinc-200">
               <Key className="w-4 h-4" />
             </span>
-            <h2 className="text-base font-extrabold text-slate-900">Settings & AI Configuration</h2>
+            <h2 className="text-base font-black text-zinc-950">Settings &amp; AI Configuration</h2>
           </div>
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="p-1.5 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+            className="p-1.5 text-zinc-400 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Tab Switcher */}
-        <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70 text-xs">
+        <div className="flex items-center bg-zinc-100/90 p-1 rounded-xl border border-zinc-200/80 text-xs">
           <button
             onClick={() => setActiveModalTab('ai')}
             className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center space-x-1.5 ${
               activeModalTab === 'ai'
-                ? 'bg-white text-indigo-600 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-black text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-950'
             }`}
           >
             <Key className="w-3.5 h-3.5" />
@@ -243,20 +243,20 @@ export const SettingsModal: React.FC = () => {
             }}
             className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center space-x-1.5 ${
               activeModalTab === 'debug'
-                ? 'bg-white text-indigo-600 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-black text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-950'
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>Model List & Probe</span>
+            <span>Model List &amp; Probe</span>
           </button>
 
           <button
             onClick={() => setActiveModalTab('network')}
             className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center space-x-1.5 ${
               activeModalTab === 'network'
-                ? 'bg-white text-indigo-600 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-black text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-950'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
@@ -353,13 +353,13 @@ export const SettingsModal: React.FC = () => {
                       setActiveModalTab('debug');
                       handleFetchAvailableModels();
                     }}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-xl text-xs transition"
+                    className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold px-3 py-1.5 rounded-xl text-xs transition"
                   >
                     List Models &rarr;
                   </button>
                   <button
                     onClick={handleSaveSettings}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs shadow-sm transition"
+                    className="bg-black hover:bg-zinc-800 text-white font-bold px-4 py-1.5 rounded-xl text-xs shadow-sm transition"
                   >
                     Save Key
                   </button>
@@ -368,28 +368,28 @@ export const SettingsModal: React.FC = () => {
             </div>
 
             {/* AI Credit Balance Top-Up */}
-            <div className="bg-gradient-to-br from-amber-50/90 to-orange-50/90 border border-amber-200/80 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+            <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-bold text-amber-900">App AI Credit Pool</span>
+                  <Sparkles className="w-4 h-4 text-zinc-900" />
+                  <span className="text-xs font-bold text-zinc-900">App AI Credit Pool</span>
                 </div>
-                <span className="text-lg font-extrabold text-amber-600">{settings.aiCredits} Credits</span>
+                <span className="text-lg font-black text-zinc-950">{settings.aiCredits} Credits</span>
               </div>
-              <p className="text-[11px] text-slate-600">
-                Atlas tracks internal sprint credits (10 per roadmap, 5 per doc). Top up freely below:
+              <p className="text-[11px] text-zinc-600 font-medium">
+                Atlas tracks internal sprint credits. Top up freely below:
               </p>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => topUpCredits(50)}
-                  className="flex-1 bg-white hover:bg-amber-50 border border-amber-200 p-2 rounded-xl text-xs font-bold text-amber-800 flex items-center justify-center space-x-1 transition shadow-xs"
+                  className="flex-1 bg-white hover:bg-zinc-100 border border-zinc-200 p-2 rounded-xl text-xs font-bold text-zinc-900 flex items-center justify-center space-x-1 transition shadow-2xs"
                 >
-                  <PlusCircle className="w-3.5 h-3.5 text-amber-500" />
+                  <PlusCircle className="w-3.5 h-3.5 text-zinc-900" />
                   <span>+50 Credits</span>
                 </button>
                 <button
                   onClick={() => topUpCredits(100)}
-                  className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold p-2 rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm transition hover:opacity-95"
+                  className="flex-1 bg-black hover:bg-zinc-800 text-white font-bold p-2 rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm transition"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>+100 Credits</span>
@@ -405,16 +405,16 @@ export const SettingsModal: React.FC = () => {
           <div className="space-y-4 animate-fadeIn">
             
             {/* ModelService.ListModels Action Card */}
-            <div className="bg-white/90 border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-xs">
+            <div className="bg-white/95 border border-zinc-200 rounded-2xl p-4 space-y-3 shadow-2xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Terminal className="w-4 h-4 text-indigo-600" />
-                  <h3 className="text-xs font-bold text-slate-900">Google ModelService.ListModels</h3>
+                  <Terminal className="w-4 h-4 text-zinc-900" />
+                  <h3 className="text-xs font-bold text-zinc-900">Google ModelService.ListModels</h3>
                 </div>
                 <button
                   onClick={handleFetchAvailableModels}
                   disabled={isFetchingModels}
-                  className="flex items-center space-x-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                  className="flex items-center space-x-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3 h-3 ${isFetchingModels ? 'animate-spin' : ''}`} />
                   <span>{isFetchingModels ? 'Querying Google...' : 'Fetch Available Models'}</span>
@@ -431,7 +431,7 @@ export const SettingsModal: React.FC = () => {
               {/* Models List Table */}
               {modelsList.length > 0 && (
                 <div className="space-y-2 pt-1 max-h-48 overflow-y-auto pr-1">
-                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
                     {modelsList.length} Models Available for Your Key:
                   </p>
                   {modelsList.map((m) => {
@@ -441,26 +441,26 @@ export const SettingsModal: React.FC = () => {
                         key={m.name}
                         className={`p-2.5 rounded-xl border flex items-center justify-between transition ${
                           isCurrent
-                            ? 'bg-indigo-50/80 border-indigo-300 shadow-xs'
-                            : 'bg-slate-50 border-slate-200 hover:bg-white'
+                            ? 'bg-zinc-100 border-zinc-400 shadow-2xs'
+                            : 'bg-zinc-50 border-zinc-200 hover:bg-white'
                         }`}
                       >
                         <div className="space-y-0.5">
                           <div className="flex items-center space-x-1.5">
-                            <span className="text-xs font-bold text-slate-900 font-mono">{m.name}</span>
+                            <span className="text-xs font-bold text-zinc-950 font-mono">{m.name}</span>
                             {isCurrent && (
-                              <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.2 rounded-full">
+                              <span className="text-[9px] bg-black text-white font-bold px-1.5 py-0.2 rounded-full">
                                 ACTIVE
                               </span>
                             )}
                           </div>
-                          <p className="text-[10px] text-slate-500 line-clamp-1">{m.description}</p>
+                          <p className="text-[10px] text-zinc-500 line-clamp-1">{m.description}</p>
                         </div>
 
                         <button
                           onClick={() => handleTestSpecificModel(m.name)}
                           disabled={isTesting}
-                          className="bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-bold transition shadow-xs shrink-0"
+                          className="bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-900 px-2.5 py-1 rounded-lg text-xs font-bold transition shadow-2xs shrink-0"
                         >
                           {isTesting && selectedModel === m.name ? 'Testing...' : 'Select & Test'}
                         </button>
@@ -472,13 +472,13 @@ export const SettingsModal: React.FC = () => {
             </div>
 
             {/* Test Probe Diagnostics */}
-            <div className="bg-white/90 border border-slate-200/80 rounded-2xl p-4 space-y-2.5 shadow-xs">
+            <div className="bg-white/95 border border-zinc-200 rounded-2xl p-4 space-y-2.5 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">Selected Model: <code className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-bold font-mono">{selectedModel}</code></span>
+                <span className="text-xs font-bold text-zinc-800">Selected Model: <code className="text-zinc-950 bg-zinc-100 px-1.5 py-0.5 rounded font-bold font-mono">{selectedModel}</code></span>
                 <button
                   onClick={() => handleTestSpecificModel(selectedModel)}
                   disabled={isTesting}
-                  className="flex items-center space-x-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs hover:opacity-95 transition disabled:opacity-50"
+                  className="flex items-center space-x-1 bg-black hover:bg-zinc-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
                   <span>{isTesting ? 'Probing...' : 'Test Selected Model'}</span>
@@ -488,20 +488,20 @@ export const SettingsModal: React.FC = () => {
               {debugResult.tested && (
                 <div className="pt-2">
                   {debugResult.success ? (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5">
+                    <div className="bg-zinc-50 border border-zinc-300 rounded-xl p-3 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
-                          <Check className="w-4 h-4 text-emerald-600" /> 200 OK — Ready for Production!
+                        <span className="text-xs font-bold text-zinc-950 flex items-center gap-1.5">
+                          <Check className="w-4 h-4 text-black" /> 200 OK — Ready for Production!
                         </span>
-                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-mono">
+                        <span className="text-[10px] font-bold bg-zinc-200 text-zinc-900 px-2 py-0.5 rounded-md font-mono">
                           {debugResult.latencyMs}ms
                         </span>
                       </div>
-                      <p className="text-xs text-emerald-700 font-medium leading-relaxed">
+                      <p className="text-xs text-zinc-700 font-medium leading-relaxed">
                         {debugResult.message}
                       </p>
                       {debugResult.preview && (
-                        <div className="bg-white/90 p-2 rounded-lg border border-emerald-100 text-[11px] font-mono text-slate-700">
+                        <div className="bg-white p-2 rounded-lg border border-zinc-200 text-[11px] font-mono text-zinc-800">
                           {debugResult.preview}
                         </div>
                       )}
@@ -533,49 +533,49 @@ export const SettingsModal: React.FC = () => {
         {/* Tab 3: Multiplayer & Friends Collaboration */}
         {activeModalTab === 'network' && (
           <div className="space-y-4 animate-fadeIn">
-            <div className="bg-white/80 border border-slate-200/80 rounded-2xl p-4 space-y-2.5 shadow-xs">
+            <div className="bg-white/90 border border-zinc-200 rounded-2xl p-4 space-y-2.5 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Wifi className="w-4 h-4 text-emerald-500" /> Real-Time Sync Status
+                <span className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
+                  <Wifi className="w-4 h-4 text-black" /> Real-Time Sync Status
                 </span>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-900 border border-zinc-200">
                   {isConnected ? 'Connected & Live' : 'Connecting...'}
                 </span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              <p className="text-xs text-zinc-600 leading-relaxed font-medium">
                 Changes to roadmap tasks, checklists, and guides sync instantaneously across all open browsers and connected peers.
               </p>
             </div>
 
             {/* How to share with Liam and Alex */}
             <div className="glass-panel p-4 rounded-2xl space-y-3">
-              <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-indigo-600" />
+              <h3 className="text-xs font-black text-zinc-950 uppercase tracking-wider flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-zinc-900" />
                 <span>How to collaborate with friends</span>
               </h3>
 
-              <div className="space-y-2 text-xs text-slate-600">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1">
-                  <p className="font-bold text-slate-800">1. Same Wi-Fi / Local Network:</p>
-                  <p className="text-[11px] text-slate-500">
-                    Find your local IP (<code className="bg-slate-200 px-1 rounded text-slate-800">ipconfig</code> &rarr; <code className="bg-slate-200 px-1 rounded text-slate-800">192.168.x.x</code>). Liam & Alex browse to:
+              <div className="space-y-2 text-xs text-zinc-600">
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+                  <p className="font-bold text-zinc-900">1. Same Wi-Fi / Local Network:</p>
+                  <p className="text-[11px] text-zinc-500">
+                    Find your local IP (<code className="bg-zinc-200 px-1 rounded text-zinc-800">ipconfig</code> &rarr; <code className="bg-zinc-200 px-1 rounded text-zinc-800">192.168.x.x</code>). Liam &amp; Alex browse to:
                   </p>
-                  <div className="bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-indigo-700 font-mono text-[11px] mt-1 font-bold">
+                  <div className="bg-white px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-950 font-mono text-[11px] mt-1 font-bold">
                     <span>http://&lt;your-local-ip&gt;:5173</span>
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1">
-                  <p className="font-bold text-slate-800">2. Free 24/7 Hosting (Render.com):</p>
-                  <p className="text-[11px] text-slate-500">
-                    Deploy repository to Render for free 24/7 WebSockets and link your custom domain (e.g. <code className="bg-slate-200 px-1 rounded text-slate-800">atlas.yourdomain.com</code>).
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+                  <p className="font-bold text-zinc-900">2. Free 24/7 Hosting (Render.com):</p>
+                  <p className="text-[11px] text-zinc-500">
+                    Deploy repository to Render for free 24/7 WebSockets and link your custom domain (e.g. <code className="bg-zinc-200 px-1 rounded text-zinc-800">atlas.yourdomain.com</code>).
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={copyShareLink}
-                className="w-full flex items-center justify-center space-x-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-2 rounded-xl text-xs transition border border-indigo-200/80"
+                className="w-full flex items-center justify-center space-x-1.5 bg-black hover:bg-zinc-800 text-white font-bold py-2 rounded-xl text-xs transition shadow-xs"
               >
                 <Copy className="w-3.5 h-3.5" />
                 <span>{copiedLink ? 'Current URL Copied!' : 'Copy Local App URL'}</span>
@@ -585,10 +585,10 @@ export const SettingsModal: React.FC = () => {
         )}
 
         {/* Footer */}
-        <div className="text-center pt-1 border-t border-slate-200/60">
+        <div className="text-center pt-1 border-t border-zinc-200">
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="text-xs text-slate-500 hover:text-slate-800 font-semibold"
+            className="text-xs text-zinc-500 hover:text-zinc-900 font-bold"
           >
             Close
           </button>
