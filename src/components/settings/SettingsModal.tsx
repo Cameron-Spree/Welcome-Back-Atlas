@@ -522,36 +522,6 @@ export const SettingsModal: React.FC = () => {
               </div>
             </div>
 
-            {/* AI Credit Balance Top-Up */}
-            <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-zinc-900" />
-                  <span className="text-xs font-bold text-zinc-900">App AI Credit Pool</span>
-                </div>
-                <span className="text-lg font-black text-zinc-950">{settings.aiCredits} Credits</span>
-              </div>
-              <p className="text-[11px] text-zinc-600 font-medium">
-                Atlas tracks internal sprint credits. Top up freely below:
-              </p>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => topUpCredits(50)}
-                  className="flex-1 bg-white hover:bg-zinc-100 border border-zinc-200 p-2 rounded-xl text-xs font-bold text-zinc-900 flex items-center justify-center space-x-1 transition shadow-2xs"
-                >
-                  <PlusCircle className="w-3.5 h-3.5 text-zinc-900" />
-                  <span>+50 Credits</span>
-                </button>
-                <button
-                  onClick={() => topUpCredits(100)}
-                  className="flex-1 bg-black hover:bg-zinc-800 text-white font-bold p-2 rounded-xl text-xs flex items-center justify-center space-x-1 shadow-sm transition"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>+100 Credits</span>
-                </button>
-              </div>
-            </div>
-
           </div>
         )}
 

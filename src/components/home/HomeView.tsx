@@ -81,11 +81,6 @@ export const HomeView: React.FC = () => {
         
         {/* Clean Centered Greeting */}
         <div className="text-center space-y-3 mb-8">
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-white border border-zinc-200/90 shadow-2xs text-xs font-bold text-zinc-700 mb-1">
-            <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
-            <span>Multiplayer Active &bull; Atlas AI Connected</span>
-          </div>
-
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-zinc-950 leading-tight">
             Welcome back,{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-black via-zinc-800 to-zinc-600">
