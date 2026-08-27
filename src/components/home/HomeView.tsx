@@ -28,7 +28,6 @@ export const HomeView: React.FC = () => {
     docs,
     setActiveTab,
     setSelectedDocId,
-    createTask,
     commitPlan,
     chatMessages,
     sendChatMessage,
@@ -41,13 +40,17 @@ export const HomeView: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const hasActiveConversation = chatMessages.some((m) => m.sender === 'user') || isSending;
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages, isSending]);
+    if (hasActiveConversation) {
+      scrollToBottom();
+    }
+  }, [chatMessages, isSending, hasActiveConversation]);
 
   const handleSendMessage = async (e?: React.FormEvent, overrideText?: string) => {
     if (e) e.preventDefault();
@@ -71,13 +74,90 @@ export const HomeView: React.FC = () => {
     setCommittedPlanIds((prev) => new Set(prev).add(msgId));
   };
 
-  const samplePrompts = [
-    'Launch 24/7 AI Chatbot booking module for Atlas Tools',
-    'Build Google Review Engine sync pipeline for trade clients',
-    'Ship Veritas iOS daily philosophy update with atmospheric UI',
-    'Create SEO blog generator automation with weekly scheduling',
-  ];
+  // 1. ZERO-CLUTTER INITIAL LANDING VIEW
+  if (!hasActiveConversation) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[75vh] max-w-2xl mx-auto w-full px-4 animate-fadeIn">
+        
+        {/* Clean Centered Greeting */}
+        <div className="text-center space-y-3 mb-8">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-white border border-zinc-200/90 shadow-2xs text-xs font-bold text-zinc-700 mb-1">
+            <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
+            <span>Multiplayer Active &bull; Atlas AI Connected</span>
+          </div>
 
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-zinc-950 leading-tight">
+            Welcome back,{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-black via-zinc-800 to-zinc-600">
+              {currentUser}
+            </span>
+          </h1>
+        </div>
+
+        {/* Center Floating Liquid Glass Omnibar */}
+        <form
+          onSubmit={handleSendMessage}
+          className="w-full bg-white/95 backdrop-blur-2xl rounded-3xl p-3 shadow-[0_15px_45px_rgba(0,0,0,0.08)] border border-zinc-300/90 flex items-center space-x-3 transition-all duration-300 focus-within:shadow-[0_20px_50px_rgba(0,0,0,0.15)] focus-within:border-black"
+        >
+          <div className="pl-2.5 text-zinc-900">
+            <Sparkles className="w-5 h-5 animate-pulse" />
+          </div>
+
+          <input
+            type="text"
+            value={inputPrompt}
+            onChange={(e) => setInputPrompt(e.target.value)}
+            placeholder="e.g. Make a social media planner for Atlas..."
+            className="flex-1 bg-transparent text-zinc-950 placeholder-zinc-400 text-sm sm:text-base font-semibold focus:outline-none px-2"
+            autoFocus
+          />
+
+          <button
+            type="submit"
+            disabled={!inputPrompt.trim()}
+            className={`p-3 rounded-2xl font-bold text-white transition-all flex items-center justify-center ${
+              inputPrompt.trim()
+                ? 'bg-black hover:bg-zinc-800 shadow-md shadow-black/20 scale-100'
+                : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+            }`}
+            title="Send to Atlas Gemini"
+          >
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </form>
+
+        {/* Clean Quick Launch Pills */}
+        <div className="flex flex-wrap items-center justify-center gap-2.5 mt-6 text-xs">
+          <button
+            onClick={() => setActiveTab('projects')}
+            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200/90 px-4 py-2 rounded-2xl font-bold shadow-2xs transition flex items-center space-x-2"
+          >
+            <LayoutGrid className="w-3.5 h-3.5 text-zinc-900" />
+            <span>Roadmap Calendar</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('learn')}
+            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200/90 px-4 py-2 rounded-2xl font-bold shadow-2xs transition flex items-center space-x-2"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-zinc-900" />
+            <span>Learning Guides ({docs.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('progress')}
+            className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200/90 px-4 py-2 rounded-2xl font-bold shadow-2xs transition flex items-center space-x-2"
+          >
+            <TrendingUp className="w-3.5 h-3.5 text-zinc-900" />
+            <span>Velocity</span>
+          </button>
+        </div>
+
+      </div>
+    );
+  }
+
+  // 2. ACTIVE CONVERSATION & PLAN PROBING VIEW (Shown dynamically after sending first prompt)
   return (
     <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-2 sm:px-4 animate-fadeIn pb-12">
       
@@ -110,237 +190,204 @@ export const HomeView: React.FC = () => {
         </div>
       </div>
 
-      {/* Hero Welcome (shown if minimal chat history) */}
-      {chatMessages.length <= 1 && (
-        <div className="text-center space-y-3 my-6 animate-fadeIn">
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-white border border-zinc-200 shadow-xs text-xs font-bold text-zinc-800 mb-1">
-            <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
-            <span>Atlas Company Knowledge Context Active</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-zinc-950 leading-tight">
-            What are we building,{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-black via-zinc-800 to-zinc-600">
-              {currentUser}?
-            </span>
-          </h1>
-
-          <p className="text-sm sm:text-base text-zinc-500 font-normal max-w-lg mx-auto">
-            Brainstorm a feature, probe requirements, and Gemini will draft actionable tasks &amp; learning literature for the team.
-          </p>
-
-          {/* Quick Idea Starters */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-3">
-            {samplePrompts.map((p, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSendMessage(undefined, p)}
-                className="bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200/90 font-bold px-3.5 py-2 rounded-2xl text-xs shadow-2xs hover:shadow-xs hover:border-zinc-400 transition flex items-center space-x-1.5"
-              >
-                <Zap className="w-3.5 h-3.5 text-zinc-900" />
-                <span>{p}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* CONVERSATION THREAD STREAM */}
       <div className="flex-1 space-y-6 my-4 min-h-[300px]">
-        {chatMessages.map((msg) => {
-          const isUser = msg.sender === 'user';
-          const isCommitted = committedPlanIds.has(msg.id) || msg.plan?.isCommitted;
+        {chatMessages
+          .filter((msg) => msg.sender === 'user' || msg.id !== 'msg-welcome')
+          .map((msg) => {
+            const isUser = msg.sender === 'user';
+            const isCommitted = committedPlanIds.has(msg.id) || msg.plan?.isCommitted;
 
-          return (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-2 animate-fadeIn`}
-            >
-              {/* Message Header Label */}
-              <div className="flex items-center space-x-1.5 text-[11px] font-bold text-zinc-400 px-1">
-                {isUser ? (
-                  <>
-                    <span>{msg.user || currentUser}</span>
-                    <span>&bull;</span>
-                    <span>{msg.timestamp}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-zinc-900 font-black flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" /> Atlas Gemini
-                    </span>
-                    <span>&bull;</span>
-                    <span>{msg.timestamp}</span>
-                  </>
-                )}
-              </div>
-
-              {/* Message Bubble Body */}
-              {isUser ? (
-                <div className="bg-black text-white px-5 py-3.5 rounded-3xl rounded-tr-sm shadow-md max-w-xl text-sm font-semibold leading-relaxed">
-                  {msg.text}
+            return (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-2 animate-fadeIn`}
+              >
+                {/* Message Header Label */}
+                <div className="flex items-center space-x-1.5 text-[11px] font-bold text-zinc-400 px-1">
+                  {isUser ? (
+                    <>
+                      <span>{msg.user || currentUser}</span>
+                      <span>&bull;</span>
+                      <span>{msg.timestamp}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-zinc-900 font-black flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> Atlas Gemini
+                      </span>
+                      <span>&bull;</span>
+                      <span>{msg.timestamp}</span>
+                    </>
+                  )}
                 </div>
-              ) : (
-                <div className="bg-white/95 backdrop-blur-2xl border border-zinc-200/90 text-zinc-900 p-5 sm:p-6 rounded-3xl rounded-tl-sm shadow-[0_10px_35px_rgba(0,0,0,0.05)] w-full max-w-3xl space-y-4">
-                  <p className="text-sm font-medium text-zinc-800 leading-relaxed">
-                    {msg.text}
-                  </p>
 
-                  {/* EMBEDDED INTERACTIVE PLAN DRAFT */}
-                  {msg.plan && (
-                    <div className="mt-4 pt-4 border-t border-zinc-200/90 space-y-4">
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="p-1 rounded-lg bg-zinc-100 text-zinc-900 font-bold text-xs">
-                            <Layers className="w-3.5 h-3.5" />
-                          </span>
-                          <span className="text-xs font-black text-zinc-950 uppercase tracking-wider">
-                            Plan: {msg.plan.promptTitle}
-                          </span>
+                {/* Message Bubble Body */}
+                {isUser ? (
+                  <div className="bg-black text-white px-5 py-3.5 rounded-3xl rounded-tr-sm shadow-md max-w-xl text-sm font-semibold leading-relaxed">
+                    {msg.text}
+                  </div>
+                ) : (
+                  <div className="bg-white/95 backdrop-blur-2xl border border-zinc-200/90 text-zinc-900 p-5 sm:p-6 rounded-3xl rounded-tl-sm shadow-[0_10px_35px_rgba(0,0,0,0.05)] w-full max-w-3xl space-y-4">
+                    <p className="text-sm font-medium text-zinc-800 leading-relaxed">
+                      {msg.text}
+                    </p>
+
+                    {/* EMBEDDED INTERACTIVE PLAN DRAFT */}
+                    {msg.plan && (
+                      <div className="mt-4 pt-4 border-t border-zinc-200/90 space-y-4">
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className="p-1 rounded-lg bg-zinc-100 text-zinc-900 font-bold text-xs">
+                              <Layers className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-xs font-black text-zinc-950 uppercase tracking-wider">
+                              Plan: {msg.plan.promptTitle}
+                            </span>
+                          </div>
+
+                          {isCommitted ? (
+                            <span className="text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold px-3 py-1 rounded-full flex items-center gap-1 shadow-2xs">
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Committed to Calendar</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] bg-zinc-100 text-zinc-800 border border-zinc-200 font-extrabold px-2.5 py-1 rounded-full">
+                              Draft ({msg.plan.tasks.length} Phases)
+                            </span>
+                          )}
                         </div>
 
-                        {isCommitted ? (
-                          <span className="text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold px-3 py-1 rounded-full flex items-center gap-1 shadow-2xs">
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Committed to Calendar</span>
-                          </span>
-                        ) : (
-                          <span className="text-[11px] bg-zinc-100 text-zinc-800 border border-zinc-200 font-extrabold px-2.5 py-1 rounded-full">
-                            Draft ({msg.plan.tasks.length} Phases)
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Phase Cards */}
-                      <div className="space-y-3">
-                        {msg.plan.tasks.map((task, pIdx) => {
-                          const doc = msg.plan?.docs[pIdx];
-                          return (
-                            <div
-                              key={task.id}
-                              className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-2xs space-y-2.5"
-                            >
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                                <div className="flex items-center space-x-2">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${
-                                      task.assignee === 'Cam'
-                                        ? 'bg-black'
-                                        : task.assignee === 'Liam'
-                                        ? 'bg-zinc-800'
-                                        : 'bg-zinc-700'
-                                    }`}
-                                  >
-                                    {task.assignee}
-                                  </span>
-                                  <h4 className="text-xs sm:text-sm font-black text-zinc-950">
-                                    {task.title}
-                                  </h4>
-                                </div>
-
-                                <span className="text-[11px] text-zinc-400 font-mono font-medium">
-                                  {task.startDate} &rarr; {task.endDate}
-                                </span>
-                              </div>
-
-                              <p className="text-xs text-zinc-600 font-normal">
-                                {task.description}
-                              </p>
-
-                              {/* Deliverables Subtask Checklist */}
-                              {task.subtasks && task.subtasks.length > 0 && (
-                                <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100 space-y-1">
-                                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">
-                                    Key Deliverables:
-                                  </span>
-                                  <ul className="text-xs text-zinc-800 space-y-1 pl-1">
-                                    {task.subtasks.map((st) => (
-                                      <li key={st.id} className="flex items-center space-x-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                        <span>{st.title}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Attached Learning Literature Guide Card */}
-                              {doc && (
-                                <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/80 flex items-start justify-between gap-3 text-xs">
-                                  <div className="space-y-1 flex-1">
-                                    <div className="flex items-center space-x-1.5 text-zinc-950 font-bold">
-                                      <BookOpen className="w-3.5 h-3.5 text-zinc-900" />
-                                      <span>{doc.title}</span>
-                                    </div>
-                                    <p className="text-[11px] text-zinc-600 leading-relaxed">
-                                      {doc.relevanceExplanation}
-                                    </p>
+                        {/* Phase Cards */}
+                        <div className="space-y-3">
+                          {msg.plan.tasks.map((task, pIdx) => {
+                            const doc = msg.plan?.docs[pIdx];
+                            return (
+                              <div
+                                key={task.id}
+                                className="bg-white rounded-2xl p-4 border border-zinc-200 shadow-2xs space-y-2.5"
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                  <div className="flex items-center space-x-2">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-black text-white ${
+                                        task.assignee === 'Cam'
+                                          ? 'bg-black'
+                                          : task.assignee === 'Liam'
+                                          ? 'bg-zinc-800'
+                                          : 'bg-zinc-700'
+                                      }`}
+                                    >
+                                      {task.assignee}
+                                    </span>
+                                    <h4 className="text-xs sm:text-sm font-black text-zinc-950">
+                                      {task.title}
+                                    </h4>
                                   </div>
 
-                                  <button
-                                    onClick={() => {
-                                      setSelectedDocId(doc.id);
-                                      setActiveTab('learn');
-                                    }}
-                                    className="bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs shrink-0 flex items-center space-x-1"
-                                  >
-                                    <span>Read Guide</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                  </button>
+                                  <span className="text-[11px] text-zinc-400 font-mono font-medium">
+                                    {task.startDate} &rarr; {task.endDate}
+                                  </span>
                                 </div>
-                              )}
 
+                                <p className="text-xs text-zinc-600 font-normal">
+                                  {task.description}
+                                </p>
+
+                                {/* Deliverables Subtask Checklist */}
+                                {task.subtasks && task.subtasks.length > 0 && (
+                                  <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100 space-y-1">
+                                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">
+                                      Key Deliverables:
+                                    </span>
+                                    <ul className="text-xs text-zinc-800 space-y-1 pl-1">
+                                      {task.subtasks.map((st) => (
+                                        <li key={st.id} className="flex items-center space-x-2">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
+                                          <span>{st.title}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {/* Attached Learning Literature Guide Card */}
+                                {doc && (
+                                  <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/80 flex items-start justify-between gap-3 text-xs">
+                                    <div className="space-y-1 flex-1">
+                                      <div className="flex items-center space-x-1.5 text-zinc-950 font-bold">
+                                        <BookOpen className="w-3.5 h-3.5 text-zinc-900" />
+                                        <span>{doc.title}</span>
+                                      </div>
+                                      <p className="text-[11px] text-zinc-600 leading-relaxed">
+                                        {doc.relevanceExplanation}
+                                      </p>
+                                    </div>
+
+                                    <button
+                                      onClick={() => {
+                                        setSelectedDocId(doc.id);
+                                        setActiveTab('learn');
+                                      }}
+                                      className="bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition shadow-2xs shrink-0 flex items-center space-x-1"
+                                    >
+                                      <span>Read Guide</span>
+                                      <ExternalLink className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )}
+
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Action Bar */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
+                          {isCommitted ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setActiveTab('projects')}
+                                className="bg-black hover:bg-zinc-800 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm transition flex items-center space-x-1.5"
+                              >
+                                <LayoutGrid className="w-3.5 h-3.5" />
+                                <span>View Calendar Roadmap</span>
+                              </button>
+
+                              <button
+                                onClick={() => setActiveTab('learn')}
+                                className="bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold px-4 py-2 rounded-xl text-xs shadow-2xs transition flex items-center space-x-1.5"
+                              >
+                                <BookOpen className="w-3.5 h-3.5 text-zinc-900" />
+                                <span>Open Learning Guides</span>
+                              </button>
                             </div>
-                          );
-                        })}
+                          ) : (
+                            <>
+                              <p className="text-[11px] text-zinc-500 font-medium self-center">
+                                Satisfied? Launch to Calendar &amp; Docs, or query to refine above.
+                              </p>
+
+                              <button
+                                onClick={() => handleCommitPlanFromMessage(msg.id, msg.plan!.tasks, msg.plan!.docs)}
+                                className="bg-black hover:bg-zinc-800 text-white font-black px-6 py-2.5 rounded-2xl text-xs shadow-md shadow-black/15 flex items-center justify-center space-x-2 transition hover:scale-[1.01]"
+                              >
+                                <Check className="w-4 h-4 text-emerald-400" />
+                                <span>Okay cool, Launch Plan! 🚀</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+
                       </div>
+                    )}
 
-                      {/* Action Bar */}
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
-                        {isCommitted ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setActiveTab('projects')}
-                              className="bg-black hover:bg-zinc-800 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm transition flex items-center space-x-1.5"
-                            >
-                              <LayoutGrid className="w-3.5 h-3.5" />
-                              <span>View Calendar Roadmap</span>
-                            </button>
-
-                            <button
-                              onClick={() => setActiveTab('learn')}
-                              className="bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 font-bold px-4 py-2 rounded-xl text-xs shadow-2xs transition flex items-center space-x-1.5"
-                            >
-                              <BookOpen className="w-3.5 h-3.5 text-zinc-900" />
-                              <span>Open Learning Guides</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <p className="text-[11px] text-zinc-500 font-medium self-center">
-                              Satisfied? Launch to Calendar &amp; Docs, or query to refine above.
-                            </p>
-
-                            <button
-                              onClick={() => handleCommitPlanFromMessage(msg.id, msg.plan!.tasks, msg.plan!.docs)}
-                              className="bg-black hover:bg-zinc-800 text-white font-black px-6 py-2.5 rounded-2xl text-xs shadow-md shadow-black/15 flex items-center justify-center space-x-2 transition hover:scale-[1.01]"
-                            >
-                              <Check className="w-4 h-4 text-emerald-400" />
-                              <span>Okay cool, Launch Plan! 🚀</span>
-                            </button>
-                          </>
-                        )}
-                      </div>
-
-                    </div>
-                  )}
-
-                </div>
-              )}
-            </div>
-          );
-        })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
         {/* Loading Indicator */}
         {isSending && (
