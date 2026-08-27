@@ -142,18 +142,105 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const API_BASE = '/api';
 
+// Bidirectional Schema Normalizers
+function normalizeUserRole(raw: any): UserRole {
+  if (!raw) return 'Cam';
+  const str = String(raw).toLowerCase();
+  if (str.includes('liam')) return 'Liam';
+  if (str.includes('alex')) return 'Alex';
+  return 'Cam';
+}
+
+function normalizeTaskStatus(raw: any): 'Backlog' | 'In Progress' | 'In Review' | 'Done' {
+  if (!raw) return 'In Progress';
+  const str = String(raw).toLowerCase().replace(/_/g, ' ');
+  if (str.includes('backlog')) return 'Backlog';
+  if (str.includes('review')) return 'In Review';
+  if (str.includes('done') || str.includes('complete')) return 'Done';
+  return 'In Progress';
+}
+
+function normalizePriority(raw: any): 'Low' | 'Medium' | 'High' {
+  if (!raw) return 'Medium';
+  const str = String(raw).toLowerCase();
+  if (str.includes('high') || str.includes('urgent')) return 'High';
+  if (str.includes('low')) return 'Low';
+  return 'Medium';
+}
+
+function normalizeTask(raw: any): Task {
+  if (!raw) return INITIAL_TASKS[0];
+  const subtasks = Array.isArray(raw.subtasks)
+    ? raw.subtasks
+    : Array.isArray(raw.checklist)
+    ? raw.checklist.map((c: any) => ({
+        id: c.id || `sub-${Date.now()}`,
+        title: c.text || c.title || '',
+        completed: Boolean(c.completed || c.isCompleted),
+      }))
+    : [];
+
+  return {
+    id: String(raw.id || `task-${Date.now()}`),
+    title: raw.title || 'Untitled Task',
+    description: raw.description || '',
+    assignee: normalizeUserRole(raw.assignee || raw.assignee_id || raw.assigneeId),
+    status: normalizeTaskStatus(raw.status),
+    priority: normalizePriority(raw.priority),
+    startDate: raw.startDate || raw.start_date || new Date().toISOString().split('T')[0],
+    endDate: raw.endDate || raw.end_date || new Date().toISOString().split('T')[0],
+    progress: Number(raw.progress ?? raw.progress_pct ?? 0),
+    tags: Array.isArray(raw.tags) ? raw.tags : ['roadmap'],
+    docId: raw.docId || raw.doc_id,
+    subtasks,
+  };
+}
+
+function normalizeDoc(raw: any): LearnDoc {
+  if (!raw) return INITIAL_DOCS[0];
+  const resources = Array.isArray(raw.resources) ? raw.resources : [];
+  const isCompleted =
+    Boolean(raw.completed) ||
+    (Array.isArray(raw.steps) && raw.steps.length > 0 && raw.steps.every((s: any) => s.completed));
+
+  return {
+    id: String(raw.id || `doc-${Date.now()}`),
+    title: raw.title || 'Learning Guide',
+    taskId: raw.taskId || raw.linked_task_id || '',
+    taskTitle: raw.taskTitle || raw.subtitle || 'General Guide',
+    assignee: normalizeUserRole(raw.assignee || raw.author_id),
+    previewUrl: raw.previewUrl || raw.preview_link_url,
+    previewImage: raw.previewImage || raw.preview_image_url,
+    relevanceExplanation: raw.relevanceExplanation || raw.ai_relevance_summary || 'Task documentation guide.',
+    content: raw.content || raw.markdown_content || '',
+    resources,
+    completed: isCompleted,
+  };
+}
+
+function normalizeActivity(raw: any): ActivityFeedItem {
+  return {
+    id: String(raw.id || `act-${Date.now()}`),
+    user: normalizeUserRole(raw.user || raw.user_id),
+    action: raw.action || (raw.action_type ? raw.action_type.replace(/_/g, ' ') : 'updated'),
+    target: raw.target || raw.target_title || 'Atlas',
+    timestamp: raw.timestamp || (raw.created_at ? new Date(raw.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'),
+  };
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserRole>('Cam');
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [docs, setDocs] = useState<LearnDoc[]>(INITIAL_DOCS);
   const [activities, setActivities] = useState<ActivityFeedItem[]>(INITIAL_ACTIVITIES);
-  const [settings, setSettings] = useState<AppSettings>({ geminiApiKey: '', aiCredits: 100, theme: 'dark' });
+  const [settings, setSettings] = useState<AppSettings>({ geminiApiKey: '', aiCredits: 100, theme: 'light' });
   const [activeTab, setActiveTab] = useState<'home' | 'learn' | 'projects' | 'progress'>('home');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
 
   const fetchData = async () => {
     try {
@@ -163,12 +250,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetch(`${API_BASE}/activities`),
         fetch(`${API_BASE}/settings`),
       ]);
-      if (tasksRes.ok) setTasks(await tasksRes.json());
-      if (docsRes.ok) setDocs(await docsRes.json());
-      if (actRes.ok) setActivities(await actRes.json());
-      if (setRes.ok) setSettings(await setRes.json());
+      if (tasksRes.ok) {
+        const data = await tasksRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setTasks(data.map(normalizeTask));
+        }
+      }
+      if (docsRes.ok) {
+        const data = await docsRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setDocs(data.map(normalizeDoc));
+        }
+      }
+      if (actRes.ok) {
+        const data = await actRes.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setActivities(data.map(normalizeActivity));
+        }
+      }
+      if (setRes.ok) {
+        const data = await setRes.json();
+        setSettings((prev) => ({ ...prev, ...data }));
+      }
     } catch {
-      // In standalone frontend or Vercel static mode, defaults remain active
+      // Offline fallback
     }
   };
 
@@ -176,34 +281,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchData();
 
     try {
-      const socket: Socket = io('/', { transports: ['websocket', 'polling'], timeout: 3000 });
+      const socket: Socket = io(window.location.origin, {
+        transports: ['websocket', 'polling'],
+        timeout: 5000,
+        reconnection: true,
+      });
+      setSocketInstance(socket);
 
-      socket.on('connect', () => setIsConnected(true));
+      socket.on('connect', () => {
+        setIsConnected(true);
+        fetchData();
+      });
       socket.on('disconnect', () => setIsConnected(false));
       socket.on('connect_error', () => setIsConnected(false));
 
-      socket.on('task:updated', (updatedTask: Task) => {
-        setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+      // Handle Task Updates (both wrapped and raw payloads)
+      socket.on('task:updated', (payload: any) => {
+        const raw = payload?.task || payload;
+        if (!raw) return;
+        const normalized = normalizeTask(raw);
+        setTasks((prev) => prev.map((t) => (t.id === normalized.id ? normalized : t)));
       });
 
-      socket.on('task:created', (newTask: Task) => {
-        setTasks((prev) => [...prev.filter((t) => t.id !== newTask.id), newTask]);
+      socket.on('task:moved', (payload: any) => {
+        const raw = payload?.task || payload;
+        if (!raw) return;
+        const normalized = normalizeTask(raw);
+        setTasks((prev) => prev.map((t) => (t.id === normalized.id ? normalized : t)));
       });
 
-      socket.on('task:deleted', (deletedId: string) => {
+      socket.on('task:created', (payload: any) => {
+        const raw = payload?.task || payload;
+        if (!raw) return;
+        const normalized = normalizeTask(raw);
+        setTasks((prev) => [...prev.filter((t) => t.id !== normalized.id), normalized]);
+      });
+
+      socket.on('task:deleted', (payload: any) => {
+        const deletedId = String(payload?.taskId || payload?.id || payload);
+        if (!deletedId) return;
         setTasks((prev) => prev.filter((t) => t.id !== deletedId));
       });
 
-      socket.on('doc:updated', (updatedDoc: LearnDoc) => {
-        setDocs((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
+      // Handle Doc Updates
+      socket.on('doc:updated', (payload: any) => {
+        const raw = payload?.doc || payload;
+        if (!raw) return;
+        const normalized = normalizeDoc(raw);
+        setDocs((prev) => prev.map((d) => (d.id === normalized.id ? normalized : d)));
       });
 
-      socket.on('activity:new', (newAct: ActivityFeedItem) => {
-        setActivities((prev) => [newAct, ...prev]);
+      socket.on('doc:created', (payload: any) => {
+        const raw = payload?.doc || payload;
+        if (!raw) return;
+        const normalized = normalizeDoc(raw);
+        setDocs((prev) => [...prev.filter((d) => d.id !== normalized.id), normalized]);
       });
 
-      socket.on('settings:updated', (newSet: AppSettings) => {
-        setSettings(newSet);
+      socket.on('doc:step_toggled', (payload: any) => {
+        const raw = payload?.doc || payload;
+        if (raw) {
+          const normalized = normalizeDoc(raw);
+          setDocs((prev) => prev.map((d) => (d.id === normalized.id ? normalized : d)));
+        }
+      });
+
+      // Handle Live Activity Feed & Credits
+      socket.on('activity:new', (payload: any) => {
+        const raw = payload?.activity || payload;
+        if (!raw) return;
+        const normalized = normalizeActivity(raw);
+        setActivities((prev) => [normalized, ...prev.filter((a) => a.id !== normalized.id)].slice(0, 50));
+      });
+
+      socket.on('credits:updated', (payload: any) => {
+        if (payload?.creditBalance !== undefined) {
+          setSettings((prev) => ({ ...prev, aiCredits: payload.creditBalance }));
+        }
+      });
+
+      socket.on('settings:updated', (newSet: any) => {
+        if (newSet) setSettings((prev) => ({ ...prev, ...newSet }));
       });
 
       return () => {
@@ -216,6 +374,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTask = async (task: Task) => {
     setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+
+    // Emit live socket event directly for instant peer sync
+    if (socketInstance && socketInstance.connected) {
+      socketInstance.emit('task:update', { taskId: task.id, updates: task, userId: currentUser });
+    }
+
     try {
       await fetch(`${API_BASE}/tasks/${task.id}`, {
         method: 'PUT',
@@ -223,7 +387,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ ...task, user: currentUser }),
       });
     } catch {
-      // Standalone mode handled
+      // Local optimistic update kept
     }
   };
 
@@ -241,38 +405,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       tags: taskData.tags || ['roadmap'],
       subtasks: taskData.subtasks || [],
     };
+
     setTasks((prev) => [...prev, newTask]);
 
+    if (socketInstance && socketInstance.connected) {
+      socketInstance.emit('task:create', { task: newTask, userId: currentUser });
+    }
+
     try {
-      await fetch(`${API_BASE}/tasks`, {
+      const res = await fetch(`${API_BASE}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...taskData, user: currentUser }),
+        body: JSON.stringify({ ...newTask, user: currentUser }),
       });
+      if (res.ok) {
+        const saved = await res.json();
+        const norm = normalizeTask(saved);
+        setTasks((prev) => prev.map((t) => (t.id === newTask.id ? norm : t)));
+      }
     } catch {
-      // Standalone mode
+      // Offline fallback
     }
   };
 
   const deleteTask = async (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+
+    if (socketInstance && socketInstance.connected) {
+      socketInstance.emit('task:delete', { taskId: id, userId: currentUser });
+    }
+
     try {
-      await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE}/tasks/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser }),
+      });
     } catch {
-      // Standalone mode
+      // Offline fallback
     }
   };
 
   const updateDoc = async (doc: LearnDoc) => {
     setDocs((prev) => prev.map((d) => (d.id === doc.id ? doc : d)));
+
     try {
       await fetch(`${API_BASE}/docs/${doc.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(doc),
+        body: JSON.stringify({ ...doc, userId: currentUser }),
       });
     } catch {
-      // Standalone mode
+      // Offline fallback
     }
   };
 
@@ -286,11 +470,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       taskId: targetTask.id,
       taskTitle: targetTask.title,
       assignee: targetTask.assignee,
-      relevanceExplanation: `Gemini generated insight: Custom curated guide specifically for ${targetTask.assignee} to complete "${targetTask.title}" using recommended industry best practices.`,
-      content: `# AI Accelerated Guide: ${targetTask.title}\n\n## Overview\nThis guide outlines the critical implementation steps for **${targetTask.title}**.\n\n### Step-by-Step Deliverables\n1. Analyze requirements and set up baseline tests.\n2. Implement the modular core.\n3. Integrate with group real-time feed.\n\n### Key Resources\n- Documentation: https://antigravity.google\n- Tutorials: Curated online documentation`,
+      relevanceExplanation: `Gemini generated guide for ${targetTask.assignee} to complete "${targetTask.title}".`,
+      content: `# AI Accelerated Guide: ${targetTask.title}\n\n## Overview\nThis guide outlines the critical implementation steps for **${targetTask.title}**.\n\n### Step-by-Step Deliverables\n1. Analyze requirements and set up baseline tests.\n2. Implement the modular core.\n3. Integrate with multiplayer real-time sync.\n\n### Key Resources\n- Modern Documentation: https://socket.io\n- React Architecture Patterns: https://react.dev`,
       resources: [
-        { title: `${targetTask.title} Reference`, url: 'https://google.com', type: 'doc' },
-        { title: 'Video Walkthrough', url: 'https://youtube.com', type: 'video' },
+        { title: `${targetTask.title} Reference`, url: 'https://socket.io', type: 'doc' },
+        { title: 'Interactive Video Walkthrough', url: 'https://youtube.com', type: 'video' },
       ],
       completed: false,
     };
@@ -299,10 +483,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSettings((prev) => ({ ...prev, aiCredits: Math.max(0, prev.aiCredits - 10) }));
 
     try {
-      await fetch(`${API_BASE}/ai/generate-doc`, {
+      await fetch(`${API_BASE}/docs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, user: currentUser }),
+        body: JSON.stringify({
+          id: newDoc.id,
+          title: newDoc.title,
+          subtitle: newDoc.taskTitle,
+          linked_task_id: newDoc.taskId,
+          markdown_content: newDoc.content,
+          ai_relevance_summary: newDoc.relevanceExplanation,
+          userId: currentUser,
+        }),
       });
     } catch {
       // Offline fallback
@@ -314,56 +506,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const generatedTasks: Task[] = [
       {
         id: `task-ai-1-${Date.now()}`,
-        title: `Research & Architecture: ${prompt.slice(0, 30)}`,
-        description: `Define initial technical specs and setup pipeline for ${prompt}`,
+        title: `Architecture & Core: ${prompt.slice(0, 26)}`,
+        description: `Define system architecture, WebSocket channels, and SQLite models for: ${prompt}`,
         assignee: 'Cam',
         status: 'In Progress',
         priority: 'High',
         startDate: today,
         endDate: today,
-        progress: 20,
-        tags: ['ai-roadmap', 'architecture'],
-        subtasks: [{ id: 'sub-ai-1', title: 'Review specs', completed: true }],
+        progress: 25,
+        tags: ['ai-plan', 'backend'],
+        subtasks: [{ id: `sub-ai-1`, title: 'Define data contracts and socket events', completed: true }],
       },
       {
         id: `task-ai-2-${Date.now()}`,
-        title: `Core Execution: ${prompt.slice(0, 30)}`,
-        description: `Implement core features and interactive components`,
+        title: `Interactive Views: ${prompt.slice(0, 26)}`,
+        description: `Build responsive Apple-style Gantt timeline and drag-and-drop Kanban for: ${prompt}`,
         assignee: 'Liam',
         status: 'In Progress',
         priority: 'Medium',
         startDate: today,
         endDate: today,
-        progress: 10,
-        tags: ['ai-roadmap', 'implementation'],
-        subtasks: [{ id: 'sub-ai-2', title: 'Build modules', completed: false }],
+        progress: 15,
+        tags: ['ai-plan', 'frontend'],
+        subtasks: [{ id: `sub-ai-2`, title: 'Design Gantt bar calculation', completed: false }],
       },
       {
         id: `task-ai-3-${Date.now()}`,
-        title: `Design & Testing: ${prompt.slice(0, 30)}`,
-        description: `Polish UI/UX and execute end-to-end verification`,
+        title: `Liquid Glass Polish: ${prompt.slice(0, 26)}`,
+        description: `Implement Apple glass visual tokens, animations, and sound effects for: ${prompt}`,
         assignee: 'Alex',
         status: 'Backlog',
         priority: 'Medium',
         startDate: today,
         endDate: today,
         progress: 0,
-        tags: ['ai-roadmap', 'qa'],
-        subtasks: [{ id: 'sub-ai-3', title: 'Verify UI & polish', completed: false }],
+        tags: ['ai-plan', 'design'],
+        subtasks: [{ id: `sub-ai-3`, title: 'Polish frosted backdrops and specular highlights', completed: false }],
       },
     ];
 
     setTasks((prev) => [...prev, ...generatedTasks]);
     setSettings((prev) => ({ ...prev, aiCredits: Math.max(0, prev.aiCredits - 15) }));
 
-    try {
-      await fetch(`${API_BASE}/ai/generate-roadmap`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, user: currentUser }),
-      });
-    } catch {
-      // Offline fallback
+    for (const t of generatedTasks) {
+      if (socketInstance && socketInstance.connected) {
+        socketInstance.emit('task:create', { task: t, userId: currentUser });
+      }
+      try {
+        await fetch(`${API_BASE}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...t, user: currentUser }),
+        });
+      } catch {
+        // Fallback
+      }
     }
   };
 
@@ -377,7 +574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(updated),
       });
     } catch {
-      // Standalone mode
+      // Offline fallback
     }
   };
 

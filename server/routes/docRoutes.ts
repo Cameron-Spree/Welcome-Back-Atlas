@@ -99,6 +99,68 @@ docRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// PUT /api/docs/:id
+docRouter.put('/:id', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      title,
+      subtitle,
+      category,
+      tags,
+      preview_image_url,
+      previewImageUrl,
+      preview_link_url,
+      previewUrl,
+      ai_relevance_summary,
+      relevanceExplanation,
+      markdown_content,
+      content,
+      steps,
+      linked_task_id,
+      taskId,
+      userId,
+      completed,
+    } = req.body;
+
+    const updates: any = {};
+    if (title !== undefined) updates.title = title;
+    if (subtitle !== undefined) updates.subtitle = subtitle;
+    if (category !== undefined) updates.category = category;
+    if (tags !== undefined) updates.tags = tags;
+    if (preview_image_url || previewImageUrl) updates.preview_image_url = preview_image_url || previewImageUrl;
+    if (preview_link_url || previewUrl) updates.preview_link_url = preview_link_url || previewUrl;
+    if (ai_relevance_summary || relevanceExplanation) updates.ai_relevance_summary = ai_relevance_summary || relevanceExplanation;
+    if (markdown_content || content) updates.markdown_content = markdown_content || content;
+    if (steps !== undefined) updates.steps = steps;
+    if (linked_task_id || taskId) updates.linked_task_id = linked_task_id || taskId;
+
+    const updatedDoc = docRepository.update(req.params.id, updates);
+    if (!updatedDoc) {
+      res.status(404).json({ error: 'DocNotFound', message: `Doc ${req.params.id} not found.` });
+      return;
+    }
+
+    const activity = activityRepository.logActivity({
+      user_id: userId || 'user-cam',
+      action_type: 'doc_updated',
+      target_type: 'doc',
+      target_id: updatedDoc.id,
+      target_title: updatedDoc.title,
+      details: { updates },
+    });
+
+    const io = req.app.locals.io || null;
+    if (io) {
+      io.emit('doc:updated', { doc: updatedDoc, activity });
+      if (activity) io.emit('activity:new', { activity });
+    }
+
+    res.json(updatedDoc);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PATCH /api/docs/:id/step
 docRouter.patch('/:id/step', (req: Request, res: Response, next: NextFunction) => {
   try {
