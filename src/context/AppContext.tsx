@@ -4,24 +4,24 @@ import { format, addDays } from 'date-fns';
 import { UserRole, Task, LearnDoc, ActivityFeedItem, AppSettings, ChatMessage, CompanyProfile } from '../types';
 
 export const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
-  name: 'Atlas',
-  industry: 'Creative Tech & Digital Product Studio',
-  summary: 'Atlas designs and engineers high-performance web applications, collaborative multiplayer platforms, and AI-enabled product workflows.',
-  targetAudience: 'Modern founders, high-velocity creative teams, and clients seeking bespoke web technology.',
-  currentGoals: 'Beta test AI-powered roadmap planning, ship client deliverables rapidly, and maintain real-time collaborative velocity.',
+  name: 'Atlas Studios UK',
+  industry: 'Software, Websites & Mobile Apps Studio ("Making the internet less boring")',
+  summary: 'Atlas Studios UK designs and builds bespoke websites, SaaS business tools (Atlas Tools: AI Chatbot, Review Engine, SEO Writer, Site Health), and atmospheric mobile apps (Veritas, Little Linguist, Trace, Flicker, Counter).',
+  targetAudience: 'Small-to-medium UK businesses, trade services, founders, and mobile app users seeking atmospheric digital experiences.',
+  currentGoals: 'Scale the Atlas Tools SaaS suite, deliver bespoke client websites (District Contracts, Meridian, Ironclad), and ship updates to App Store iOS apps.',
   teamRoles: {
-    cam: 'Lead Architecture & Backend Engineering (APIs, SQLite/Postgres schemas, WebSockets, AI pipelines).',
-    liam: 'Lead Frontend Engineering (React, TypeScript, Tailwind CSS, Gantt timeline roadmaps, UI micro-interactions).',
-    alex: 'Design Director & QA/Strategy Lead (Design systems, UI/UX polish, social media asset kits, user flows).',
+    cam: 'Lead Backend & Systems Architect: Builds Atlas Tools APIs, AI Chatbot engines, Google Review sync, databases, and secure servers.',
+    liam: 'Lead Frontend & App Engineer: Builds responsive web interfaces, Next.js sites, iOS app experiences, and fluid interactive UIs.',
+    alex: 'Design Director & QA Lead: Crafts visual atmosphere, UX design systems, App Store icon/screenshot assets, and end-to-end quality assurance.',
   },
-  techStack: 'React 18, TypeScript, Tailwind CSS (Apple Liquid Glass), WebSockets, Google Gemini LLM API',
+  techStack: 'Next.js, React, TypeScript, Tailwind CSS, iOS/SwiftUI, Node.js, WebSockets, Google Gemini LLM, SQLite/PostgreSQL',
 };
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {
     id: 'msg-welcome',
     sender: 'assistant',
-    text: "Welcome back! I'm Atlas Gemini AI — loaded with your company context for Cam (Backend), Liam (Frontend), and Alex (Design/QA). What would you like to build, plan, or brainstorm today?",
+    text: "Welcome back! I'm Atlas Gemini AI — fully loaded with context on Atlas Studios UK (Atlas Tools SaaS, Custom Websites, and Atmospheric Mobile Apps like Veritas & Little Linguist). What are we building or planning today for Cam, Liam, and Alex?",
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   },
 ];

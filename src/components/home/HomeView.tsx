@@ -72,9 +72,10 @@ export const HomeView: React.FC = () => {
   };
 
   const samplePrompts = [
-    'Make a social media planner for Atlas',
-    'Build a client booking & invoice portal in 7 days',
-    'Design an API rate limiter & real-time webhook sync',
+    'Launch 24/7 AI Chatbot booking module for Atlas Tools',
+    'Build Google Review Engine sync pipeline for trade clients',
+    'Ship Veritas iOS daily philosophy update with atmospheric UI',
+    'Create SEO blog generator automation with weekly scheduling',
   ];
 
   return (
