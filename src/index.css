@@ -4,18 +4,18 @@
 
 @layer base {
   body {
-    @apply bg-[#fafafa] text-zinc-900 antialiased selection:bg-black selection:text-white;
+    @apply bg-white text-zinc-950 antialiased selection:bg-black selection:text-white;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
 /* Apple Liquid / Frosted Glass System - Crisp Ultra-White Edition */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(28px) saturate(200%);
   -webkit-backdrop-filter: blur(28px) saturate(200%);
   border: 1px solid rgba(255, 255, 255, 1);
-  box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(228, 228, 231, 0.85);
+  box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .glass-panel-elevated {
@@ -23,29 +23,29 @@
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   border: 1px solid rgba(255, 255, 255, 1);
-  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.09), 0 0 0 1px rgba(212, 212, 216, 0.85);
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.07);
 }
 
 .glass-card {
   background: #ffffff;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(228, 228, 231, 0.75);
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 0 0 1px rgba(0, 0, 0, 0.05);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
   background: #ffffff;
   transform: translateY(-2px);
-  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
 
 .glass-input {
   background: #ffffff;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(228, 228, 231, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.2s ease;
 }
@@ -58,8 +58,8 @@
 
 .glass-pill {
   background: #ffffff;
-  border: 1px solid rgba(228, 228, 231, 0.9);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.2s ease;
 }
 
@@ -77,16 +77,9 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-/* Ambient Liquid Monochrome Gradient Mesh Background */
+/* Pure Brilliant White Ambient Background */
 .apple-bg-mesh {
-  background-color: #fafafa;
-  background-image: 
-    radial-gradient(at 15% 15%, rgba(228, 228, 231, 0.6) 0px, transparent 55%),
-    radial-gradient(at 85% 10%, rgba(244, 244, 245, 0.8) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, rgba(250, 250, 250, 0.9) 0px, transparent 60%),
-    radial-gradient(at 85% 85%, rgba(228, 228, 231, 0.5) 0px, transparent 55%),
-    radial-gradient(at 10% 85%, rgba(244, 244, 245, 0.7) 0px, transparent 50%);
-  background-attachment: fixed;
+  background-color: #ffffff;
 }
 
 @keyframes fadeIn {
