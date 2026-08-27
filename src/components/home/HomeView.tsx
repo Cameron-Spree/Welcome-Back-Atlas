@@ -97,7 +97,7 @@ export const HomeView: React.FC = () => {
         {/* Center Floating Liquid Glass Omnibar */}
         <form
           onSubmit={handleSendMessage}
-          className="w-full bg-white/95 backdrop-blur-2xl rounded-3xl p-3 shadow-[0_15px_45px_rgba(0,0,0,0.08)] border border-zinc-300/90 flex items-center space-x-3 transition-all duration-300 focus-within:shadow-[0_20px_50px_rgba(0,0,0,0.15)] focus-within:border-black"
+          className="w-full glass-panel-elevated liquid-shimmer rounded-3xl p-3 shadow-[0_20px_50px_rgba(0,0,0,0.08)] border border-white flex items-center space-x-3 transition-all duration-300 focus-within:shadow-[0_25px_60px_rgba(0,0,0,0.15)] focus-within:border-black"
         >
           <div className="pl-2.5 text-zinc-900">
             <Sparkles className="w-5 h-5 animate-pulse" />
