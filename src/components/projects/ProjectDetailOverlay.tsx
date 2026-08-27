@@ -15,6 +15,17 @@ export const ProjectDetailOverlay: React.FC<Props> = ({ task, onClose }) => {
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [isGeneratingDoc, setIsGeneratingDoc] = useState(false);
 
+  // Close on Escape key press
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const matchingDoc = docs.find((d) => d.taskId === task.id || d.id === task.docId);
 
   const handleSave = async () => {
@@ -53,24 +64,46 @@ export const ProjectDetailOverlay: React.FC<Props> = ({ task, onClose }) => {
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-md flex items-center justify-center p-4 lg:p-6 overflow-y-auto animate-fadeIn">
-      <div className="glass-panel-elevated rounded-3xl max-w-3xl lg:max-w-4xl w-full p-6 lg:p-8 space-y-6 shadow-2xl relative border border-white max-h-[90vh] overflow-y-auto">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-md flex items-center justify-center p-4 lg:p-6 overflow-y-auto animate-fadeIn cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="glass-panel-elevated liquid-shimmer rounded-3xl max-w-3xl lg:max-w-4xl w-full p-6 lg:p-8 space-y-6 shadow-2xl relative border border-white max-h-[90vh] overflow-y-auto cursor-default"
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-200/80 pb-4">
           <div className="flex items-center space-x-2.5">
-            <span className="text-xs bg-zinc-100 text-zinc-900 font-black px-3 py-1 rounded-full border border-zinc-200">
-              Project Inspector &amp; Literature
+            <span className="text-xs bg-black text-white font-black px-3 py-1 rounded-full shadow-2xs">
+              Project Inspector
             </span>
             <span className="text-xs text-zinc-400 font-mono">ID: {task.id}</span>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleDelete}
+              className="flex items-center space-x-1.5 text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-2xs"
+              title="Delete this project task"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 text-zinc-500 hover:text-zinc-950 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition"
+              title="Close modal (Esc or click outside)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Task Title & Description Input */}

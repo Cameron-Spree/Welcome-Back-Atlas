@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Task } from '../../types';
+import { Task, TaskStatus } from '../../types';
 import { ProjectDetailOverlay } from './ProjectDetailOverlay';
 import {
   Calendar as CalendarIcon,
@@ -13,6 +13,7 @@ import {
   ChevronRight,
   User,
   Timer,
+  GripVertical,
 } from 'lucide-react';
 import {
   format,
@@ -30,6 +31,7 @@ export const ProjectsView: React.FC = () => {
   const {
     currentUser,
     tasks,
+    updateTask,
     createTask,
     generateAiRoadmap,
     selectedTaskId,
@@ -44,6 +46,8 @@ export const ProjectsView: React.FC = () => {
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [promptText, setPromptText] = useState('');
   const [showPromptInput, setShowPromptInput] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
   // Calendar Window Navigation (Default: 18 days centered around today)
   const [calendarStartDate, setCalendarStartDate] = useState<Date>(() => subDays(startOfDay(new Date()), 1));
@@ -59,11 +63,11 @@ export const ProjectsView: React.FC = () => {
     return tasks.filter((t) => (filterUser === 'All' ? true : t.assignee === filterUser));
   }, [tasks, filterUser]);
 
-  const kanbanColumns = [
-    { title: 'Backlog', status: 'Backlog', headerBg: 'bg-slate-100/90 text-slate-700' },
-    { title: 'In Progress', status: 'In Progress', headerBg: 'bg-indigo-50/90 text-indigo-700' },
-    { title: 'In Review', status: 'In Review', headerBg: 'bg-purple-50/90 text-purple-700' },
-    { title: 'Completed', status: 'Done', headerBg: 'bg-emerald-50/90 text-emerald-700' },
+  const kanbanColumns: { title: string; status: TaskStatus; headerBg: string }[] = [
+    { title: 'Backlog', status: 'Backlog', headerBg: 'bg-zinc-100 text-zinc-800' },
+    { title: 'In Progress', status: 'In Progress', headerBg: 'bg-black text-white' },
+    { title: 'In Review', status: 'In Review', headerBg: 'bg-zinc-800 text-white' },
+    { title: 'Completed', status: 'Done', headerBg: 'bg-emerald-600 text-white' },
   ];
 
   const handleCreateNewTask = async () => {
@@ -424,46 +428,119 @@ export const ProjectsView: React.FC = () => {
         </div>
       )}
 
-      {/* SWITCHABLE VIEW: Kanban Board */}
+      {/* SWITCHABLE VIEW: Kanban Board with Drag and Drop */}
       {viewMode === 'kanban' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 animate-fadeIn">
           {kanbanColumns.map((col) => {
             const colTasks = filteredTasks.filter((t) => t.status === col.status);
+            const isTarget = dragOverCol === col.status;
+
             return (
-              <div key={col.status} className="glass-panel p-4 rounded-3xl space-y-3.5 shadow-sm">
-                <div className={`flex items-center justify-between p-2.5 rounded-2xl ${col.headerBg} border border-slate-200/60`}>
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider">{col.title}</h3>
-                  <span className="text-xs bg-white text-slate-700 px-2 py-0.5 rounded-full font-bold shadow-xs">
+              <div
+                key={col.status}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverCol !== col.status) {
+                    setDragOverCol(col.status);
+                  }
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  setDragOverCol(null);
+                }}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  setDragOverCol(null);
+                  const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId;
+                  if (taskId) {
+                    const taskToMove = tasks.find((t) => t.id === taskId);
+                    if (taskToMove && taskToMove.status !== col.status) {
+                      await updateTask({ ...taskToMove, status: col.status });
+                    }
+                  }
+                  setDraggedTaskId(null);
+                }}
+                className={`glass-panel p-4 rounded-3xl space-y-3.5 shadow-sm transition-all duration-200 ${
+                  isTarget ? 'ring-2 ring-black bg-zinc-50 scale-[1.01]' : ''
+                }`}
+              >
+                {/* Column Header */}
+                <div className={`flex items-center justify-between p-2.5 rounded-2xl ${col.headerBg} border border-zinc-200/90 shadow-2xs`}>
+                  <h3 className="text-xs font-black uppercase tracking-wider">{col.title}</h3>
+                  <span className="text-xs bg-white text-zinc-950 px-2 py-0.5 rounded-full font-black shadow-2xs">
                     {colTasks.length}
                   </span>
                 </div>
 
-                <div className="space-y-2.5">
+                {/* Column Task Cards */}
+                <div className="space-y-2.5 min-h-[160px]">
                   {colTasks.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-slate-400 rounded-2xl border border-dashed border-slate-200">
-                      Empty column
+                    <div className="p-6 text-center text-xs text-zinc-400 rounded-2xl border-2 border-dashed border-zinc-200 font-medium">
+                      Drag tasks here
                     </div>
                   ) : (
-                    colTasks.map((t) => (
-                      <div
-                        key={t.id}
-                        onClick={() => setActiveOverlayTask(t)}
-                        className="glass-card p-3.5 rounded-2xl cursor-pointer transition shadow-xs space-y-2 group"
-                      >
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md font-bold text-[10px]">
-                            {t.assignee}
-                          </span>
-                          <span className="text-slate-400 font-medium">{t.endDate}</span>
+                    colTasks.map((t) => {
+                      const isDraggingThis = draggedTaskId === t.id;
+
+                      return (
+                        <div
+                          key={t.id}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', t.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            setDraggedTaskId(t.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTaskId(null);
+                            setDragOverCol(null);
+                          }}
+                          onClick={() => setActiveOverlayTask(t)}
+                          className={`glass-card p-3.5 rounded-2xl cursor-grab active:cursor-grabbing transition-all shadow-2xs space-y-2 group border border-white ${
+                            isDraggingThis
+                              ? 'opacity-30 scale-95 border-dashed border-zinc-400'
+                              : 'hover:scale-[1.01] hover:border-black'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center space-x-1.5">
+                              <GripVertical className="w-3.5 h-3.5 text-zinc-400 group-hover:text-black transition" />
+                              <span
+                                className={`px-2 py-0.5 rounded-md font-black text-[10px] text-white ${
+                                  t.assignee === 'Cam'
+                                    ? 'bg-black'
+                                    : t.assignee === 'Liam'
+                                    ? 'bg-zinc-800'
+                                    : 'bg-zinc-700'
+                                }`}
+                              >
+                                {t.assignee}
+                              </span>
+                            </div>
+                            <span className="text-zinc-400 font-mono text-[10px]">{t.endDate}</span>
+                          </div>
+
+                          <h4 className="font-bold text-zinc-950 text-xs group-hover:text-black transition-colors">
+                            {t.title}
+                          </h4>
+
+                          <p className="text-[11px] text-zinc-600 line-clamp-2 font-normal">
+                            {t.description}
+                          </p>
+
+                          {/* Subtasks Count indicator */}
+                          {t.subtasks && t.subtasks.length > 0 && (
+                            <div className="text-[10px] font-bold text-zinc-500 bg-zinc-50 px-2 py-1 rounded-lg border border-zinc-100 flex items-center justify-between">
+                              <span>Deliverables:</span>
+                              <span className="text-zinc-900 font-mono">
+                                {t.subtasks.filter((s) => s.completed).length}/{t.subtasks.length}
+                              </span>
+                            </div>
+                          )}
                         </div>
-
-                        <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">
-                          {t.title}
-                        </h4>
-
-                        <p className="text-[11px] text-slate-500 line-clamp-2">{t.description}</p>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
