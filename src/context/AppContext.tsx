@@ -510,19 +510,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const model = settings.geminiModel || 'gemini-1.5-flash';
 
     if (apiKey) {
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      text: `You are an agile software project manager. Decompose project goal: "${prompt}" into 3 or 4 sequential deliverables for Cam (Backend/Architecture), Liam (Frontend/UI), and Alex (Design/QA).
+      const candidateModels = Array.from(new Set([
+        model,
+        'gemini-1.5-flash-latest',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-exp',
+        'gemini-1.5-flash',
+        'gemini-pro',
+      ]));
+
+      for (const testMod of candidateModels) {
+        try {
+          const endpoints = [
+            `https://generativelanguage.googleapis.com/v1beta/models/${testMod}:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1/models/${testMod}:generateContent?key=${apiKey}`,
+          ];
+
+          let successData: any = null;
+
+          for (const ep of endpoints) {
+            const res = await fetch(ep, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: `You are an agile software project manager. Decompose project goal: "${prompt}" into 3 or 4 sequential deliverables for Cam (Backend/Architecture), Liam (Frontend/UI), and Alex (Design/QA).
 Respond with a JSON array of objects with the exact schema:
 [
   {
@@ -535,67 +551,74 @@ Respond with a JSON array of objects with the exact schema:
     "subtasks": ["subtask 1", "subtask 2"]
   }
 ]`,
-                    },
-                  ],
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  temperature: 0.3,
+                  responseMimeType: 'application/json',
                 },
-              ],
-              generationConfig: {
-                temperature: 0.3,
-                responseMimeType: 'application/json',
-              },
-            }),
-          }
-        );
+              }),
+            });
 
-        if (res.ok) {
-          const data = await res.json();
-          const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (jsonText) {
-            const parsed = JSON.parse(jsonText);
-            const list = Array.isArray(parsed) ? parsed : parsed.tasks || [];
-            if (list.length > 0) {
-              generatedTasks = list.map((item: any, i: number) => {
-                const startOffset = item.startOffsetDays !== undefined ? Number(item.startOffsetDays) : i * 2;
-                const duration = item.durationDays !== undefined ? Math.max(2, Number(item.durationDays)) : 4;
-                const startDate = format(addDays(baseDate, startOffset), 'yyyy-MM-dd');
-                const endDate = format(addDays(baseDate, startOffset + duration), 'yyyy-MM-dd');
-
-                const assignee: UserRole =
-                  item.assignee === 'Liam' || item.assignee === 'Alex' || item.assignee === 'Cam'
-                    ? item.assignee
-                    : i % 3 === 0
-                    ? 'Cam'
-                    : i % 3 === 1
-                    ? 'Liam'
-                    : 'Alex';
-
-                const subtasks = Array.isArray(item.subtasks)
-                  ? item.subtasks.map((st: any, sIdx: number) => ({
-                      id: `sub-ai-${Date.now()}-${sIdx}`,
-                      title: typeof st === 'string' ? st : st.title || 'Deliverable',
-                      completed: false,
-                    }))
-                  : [];
-
-                return {
-                  id: `task-gemini-${Date.now()}-${i}`,
-                  title: item.title || `Phase ${i + 1}`,
-                  description: item.description || `Deliverables for ${prompt}`,
-                  assignee,
-                  status: (i === 0 ? 'In Progress' : 'Backlog') as any,
-                  priority: (item.priority || 'Medium') as any,
-                  startDate,
-                  endDate,
-                  progress: i === 0 ? 20 : 0,
-                  tags: ['gemini-ai', prompt.slice(0, 12)],
-                  subtasks,
-                };
-              });
+            if (res.ok) {
+              const data = await res.json();
+              const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (jsonText) {
+                const parsed = JSON.parse(jsonText);
+                const list = Array.isArray(parsed) ? parsed : parsed.tasks || [];
+                if (list.length > 0) {
+                  successData = list;
+                  break;
+                }
+              }
             }
           }
+
+          if (successData) {
+            generatedTasks = successData.map((item: any, i: number) => {
+              const startOffset = item.startOffsetDays !== undefined ? Number(item.startOffsetDays) : i * 2;
+              const duration = item.durationDays !== undefined ? Math.max(2, Number(item.durationDays)) : 4;
+              const startDate = format(addDays(baseDate, startOffset), 'yyyy-MM-dd');
+              const endDate = format(addDays(baseDate, startOffset + duration), 'yyyy-MM-dd');
+
+              const assignee: UserRole =
+                item.assignee === 'Liam' || item.assignee === 'Alex' || item.assignee === 'Cam'
+                  ? item.assignee
+                  : i % 3 === 0
+                  ? 'Cam'
+                  : i % 3 === 1
+                  ? 'Liam'
+                  : 'Alex';
+
+              const subtasks = Array.isArray(item.subtasks)
+                ? item.subtasks.map((st: any, sIdx: number) => ({
+                    id: `sub-ai-${Date.now()}-${sIdx}`,
+                    title: typeof st === 'string' ? st : st.title || 'Deliverable',
+                    completed: false,
+                  }))
+                : [];
+
+              return {
+                id: `task-gemini-${Date.now()}-${i}`,
+                title: item.title || `Phase ${i + 1}`,
+                description: item.description || `Deliverables for ${prompt}`,
+                assignee,
+                status: (i === 0 ? 'In Progress' : 'Backlog') as any,
+                priority: (item.priority || 'Medium') as any,
+                startDate,
+                endDate,
+                progress: i === 0 ? 20 : 0,
+                tags: ['gemini-ai', prompt.slice(0, 12)],
+                subtasks,
+              };
+            });
+            break;
+          }
+        } catch (err) {
+          console.warn('[AppContext] Direct Gemini attempt failed, trying next candidate:', err);
         }
-      } catch (err) {
-        console.warn('[AppContext] Direct Gemini roadmap generation failed, using intelligent fallback:', err);
       }
     }
 

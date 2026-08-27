@@ -34,6 +34,8 @@ export const SettingsModal: React.FC = () => {
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+
   const handleTestConnection = async () => {
     const key = apiKeyInput.trim();
     if (!key) {
@@ -53,86 +55,133 @@ export const SettingsModal: React.FC = () => {
 
     const startTime = Date.now();
 
+    // 1. Fetch exact available models for this API key from Google
+    let candidateModels = [
+      selectedModel,
+      'gemini-1.5-flash-latest',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-exp',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-8b',
+      'gemini-pro',
+    ];
+
     try {
-      // Direct browser-level probe to Google Gemini API (Works seamlessly on Vercel!)
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${key}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: 'Respond with exactly: "Atlas Connected"' }],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 20,
-            },
-          }),
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        if (Array.isArray(listData.models)) {
+          const validModels = listData.models
+            .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+            .map((m: any) => m.name.replace('models/', ''));
+
+          if (validModels.length > 0) {
+            setDiscoveredModels(validModels);
+            // prioritize selectedModel, then flash-latest or 2.0-flash
+            candidateModels = [
+              ...validModels.filter((m: string) => m.includes('flash')),
+              ...validModels,
+            ];
+          }
         }
-      );
-
-      const latencyMs = Date.now() - startTime;
-
-      if (!res.ok) {
-        let errBody: any = {};
-        try {
-          errBody = await res.json();
-        } catch {}
-
-        const status = res.status;
-        const apiMsg = errBody.error?.message || res.statusText;
-        const apiCode = errBody.error?.status || `HTTP_${status}`;
-
-        let helpMsg = 'Make sure the entire key (starting with AIzaSy...) was pasted without spaces.';
-        if (status === 400 || apiCode === 'INVALID_ARGUMENT') {
-          helpMsg = 'Invalid API key. Please generate a fresh key at aistudio.google.com.';
-        } else if (status === 429 || apiCode === 'RESOURCE_EXHAUSTED') {
-          helpMsg = 'Free tier rate limit reached. Please wait 60 seconds.';
-        } else if (status === 403 || apiCode === 'PERMISSION_DENIED') {
-          helpMsg = 'Permission denied. Ensure the Generative Language API is enabled in your Google AI Studio project.';
-        }
-
-        setDebugResult({
-          tested: true,
-          success: false,
-          model: selectedModel,
-          latencyMs,
-          error: apiCode,
-          message: apiMsg,
-          help: helpMsg,
-        });
-        return;
       }
+    } catch {}
 
-      const data = await res.json();
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Atlas Connected';
+    // Deduplicate candidate models
+    const uniqueCandidates = Array.from(new Set(candidateModels));
+
+    let lastError: any = null;
+    let workingModel: string | null = null;
+    let workingPreview = '';
+
+    for (const testMod of uniqueCandidates) {
+      try {
+        const endpoints = [
+          `https://generativelanguage.googleapis.com/v1beta/models/${testMod}:generateContent?key=${key}`,
+          `https://generativelanguage.googleapis.com/v1/models/${testMod}:generateContent?key=${key}`,
+        ];
+
+        for (const ep of endpoints) {
+          const res = await fetch(ep, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: 'Respond with the exact word: "Atlas Connected"' }],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 20,
+              },
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            workingPreview = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Atlas Connected';
+            workingModel = testMod;
+            break;
+          } else {
+            let errBody: any = {};
+            try {
+              errBody = await res.json();
+            } catch {}
+            lastError = {
+              status: res.status,
+              apiMsg: errBody.error?.message || res.statusText,
+              apiCode: errBody.error?.status || `HTTP_${res.status}`,
+            };
+          }
+        }
+
+        if (workingModel) break;
+      } catch (err: any) {
+        lastError = { status: 0, apiMsg: err.message, apiCode: 'NETWORK_ERROR' };
+      }
+    }
+
+    const latencyMs = Date.now() - startTime;
+
+    if (workingModel) {
+      setSelectedModel(workingModel);
+      await updateSettings({
+        geminiApiKey: key,
+        geminiModel: workingModel,
+      });
 
       setDebugResult({
         tested: true,
         success: true,
-        model: selectedModel,
+        model: workingModel,
         latencyMs,
-        message: `Connected successfully to Google Gemini (${selectedModel})! Free-Tier 100% Verified.`,
-        preview: reply,
+        message: `Connected successfully to Google Gemini (${workingModel})! 100% Free-Tier Verified.`,
+        preview: workingPreview,
       });
-    } catch (err: any) {
-      const latencyMs = Date.now() - startTime;
+    } else {
+      let helpMsg = 'Make sure the entire key (starting with AIzaSy...) was pasted without extra spaces.';
+      if (lastError?.status === 400 || lastError?.apiCode === 'INVALID_ARGUMENT') {
+        helpMsg = 'Invalid API key. Please generate a fresh key at https://aistudio.google.com/app/apikey.';
+      } else if (lastError?.status === 429 || lastError?.apiCode === 'RESOURCE_EXHAUSTED') {
+        helpMsg = 'Free tier rate limit reached. Please wait 60 seconds.';
+      } else if (lastError?.status === 403 || lastError?.apiCode === 'PERMISSION_DENIED') {
+        helpMsg = 'Permission denied. Ensure the Generative Language API is enabled in your Google AI Studio project.';
+      }
+
       setDebugResult({
         tested: true,
         success: false,
         model: selectedModel,
         latencyMs,
-        error: 'BROWSER_NETWORK_ERROR',
-        message: err.message || 'Browser failed to reach Google Gemini API.',
-        help: 'Ensure your browser has internet access to https://generativelanguage.googleapis.com.',
+        error: lastError?.apiCode || 'MODEL_NOT_FOUND',
+        message: lastError?.apiMsg || 'No supported generateContent models responded.',
+        help: helpMsg,
       });
-    } finally {
-      setIsTesting(false);
     }
+
+    setIsTesting(false);
   };
 
   const localOrigin = window.location.origin;
