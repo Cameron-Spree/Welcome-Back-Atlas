@@ -35,152 +35,161 @@ export const SettingsModal: React.FC = () => {
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handleTestConnection = async () => {
+  interface GeminiModelInfo {
+    name: string;
+    displayName: string;
+    description: string;
+    supportedGenerationMethods?: string[];
+  }
+
+  const [modelsList, setModelsList] = useState<GeminiModelInfo[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [listModelsError, setListModelsError] = useState<string | null>(null);
+
+  // Function to call ModelService.ListModels directly from Google AI Studio
+  const handleFetchAvailableModels = async () => {
     const key = apiKeyInput.trim();
     if (!key) {
-      setDebugResult({
-        tested: true,
-        success: false,
-        model: selectedModel,
-        error: 'NO_KEY',
-        message: 'Please paste your Google AI Studio API key (starts with AIzaSy...).',
-        help: 'You can get a free key in 10 seconds at https://aistudio.google.com/app/apikey',
-      });
+      setListModelsError('Please enter your Google AI Studio API key first.');
       return;
     }
 
+    setIsFetchingModels(true);
+    setListModelsError(null);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        let errBody: any = {};
+        try {
+          errBody = await res.json();
+        } catch {}
+        throw new Error(errBody.error?.message || `HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      if (Array.isArray(data.models)) {
+        const parsed: GeminiModelInfo[] = data.models
+          .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+          .map((m: any) => ({
+            name: m.name.replace('models/', ''),
+            displayName: m.displayName || m.name.replace('models/', ''),
+            description: m.description || 'Supports generateContent',
+            supportedGenerationMethods: m.supportedGenerationMethods || [],
+          }));
+
+        setModelsList(parsed);
+
+        // If current selectedModel is not in list, pick the first working flash model
+        const hasCurrent = parsed.some((m) => m.name === selectedModel);
+        if (!hasCurrent && parsed.length > 0) {
+          const flashModel = parsed.find((m) => m.name.includes('flash')) || parsed[0];
+          setSelectedModel(flashModel.name);
+          await updateSettings({ geminiApiKey: key, geminiModel: flashModel.name });
+        }
+      } else {
+        throw new Error('Google did not return any models for this API key.');
+      }
+    } catch (err: any) {
+      setListModelsError(err.message || 'Failed to fetch models list from Google AI Studio.');
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
+  const handleTestSpecificModel = async (targetModel: string) => {
+    const key = apiKeyInput.trim();
+    if (!key) return;
+
     setIsTesting(true);
+    setSelectedModel(targetModel);
     setDebugResult({ tested: false });
 
     const startTime = Date.now();
 
-    // 1. Fetch exact available models for this API key from Google
-    let candidateModels = [
-      selectedModel,
-      'gemini-1.5-flash-latest',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-exp',
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-8b',
-      'gemini-pro',
-    ];
-
     try {
-      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        if (Array.isArray(listData.models)) {
-          const validModels = listData.models
-            .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
-            .map((m: any) => m.name.replace('models/', ''));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
 
-          if (validModels.length > 0) {
-            setDiscoveredModels(validModels);
-            // prioritize selectedModel, then flash-latest or 2.0-flash
-            candidateModels = [
-              ...validModels.filter((m: string) => m.includes('flash')),
-              ...validModels,
-            ];
-          }
-        }
-      }
-    } catch {}
-
-    // Deduplicate candidate models
-    const uniqueCandidates = Array.from(new Set(candidateModels));
-
-    let lastError: any = null;
-    let workingModel: string | null = null;
-    let workingPreview = '';
-
-    for (const testMod of uniqueCandidates) {
-      try {
-        const endpoints = [
-          `https://generativelanguage.googleapis.com/v1beta/models/${testMod}:generateContent?key=${key}`,
-          `https://generativelanguage.googleapis.com/v1/models/${testMod}:generateContent?key=${key}`,
-        ];
-
-        for (const ep of endpoints) {
-          const res = await fetch(ep, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: 'user',
-                  parts: [{ text: 'Respond with the exact word: "Atlas Connected"' }],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 20,
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${key}`,
+        {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: 'Respond with exactly: "Atlas Connected"' }],
               },
-            }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            workingPreview = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Atlas Connected';
-            workingModel = testMod;
-            break;
-          } else {
-            let errBody: any = {};
-            try {
-              errBody = await res.json();
-            } catch {}
-            lastError = {
-              status: res.status,
-              apiMsg: errBody.error?.message || res.statusText,
-              apiCode: errBody.error?.status || `HTTP_${res.status}`,
-            };
-          }
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 20,
+            },
+          }),
         }
+      );
+      clearTimeout(timeoutId);
 
-        if (workingModel) break;
-      } catch (err: any) {
-        lastError = { status: 0, apiMsg: err.message, apiCode: 'NETWORK_ERROR' };
+      const latencyMs = Date.now() - startTime;
+
+      if (!res.ok) {
+        let errBody: any = {};
+        try {
+          errBody = await res.json();
+        } catch {}
+
+        setDebugResult({
+          tested: true,
+          success: false,
+          model: targetModel,
+          latencyMs,
+          error: errBody.error?.status || `HTTP_${res.status}`,
+          message: errBody.error?.message || res.statusText,
+          help: 'Try choosing another model from the list below.',
+        });
+      } else {
+        const data = await res.json();
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Atlas Connected';
+
+        await updateSettings({ geminiApiKey: key, geminiModel: targetModel });
+
+        setDebugResult({
+          tested: true,
+          success: true,
+          model: targetModel,
+          latencyMs,
+          message: `Connected successfully to Google Gemini (${targetModel})! 100% Free-Tier Verified.`,
+          preview: reply,
+        });
       }
-    }
-
-    const latencyMs = Date.now() - startTime;
-
-    if (workingModel) {
-      setSelectedModel(workingModel);
-      await updateSettings({
-        geminiApiKey: key,
-        geminiModel: workingModel,
-      });
-
-      setDebugResult({
-        tested: true,
-        success: true,
-        model: workingModel,
-        latencyMs,
-        message: `Connected successfully to Google Gemini (${workingModel})! 100% Free-Tier Verified.`,
-        preview: workingPreview,
-      });
-    } else {
-      let helpMsg = 'Make sure the entire key (starting with AIzaSy...) was pasted without extra spaces.';
-      if (lastError?.status === 400 || lastError?.apiCode === 'INVALID_ARGUMENT') {
-        helpMsg = 'Invalid API key. Please generate a fresh key at https://aistudio.google.com/app/apikey.';
-      } else if (lastError?.status === 429 || lastError?.apiCode === 'RESOURCE_EXHAUSTED') {
-        helpMsg = 'Free tier rate limit reached. Please wait 60 seconds.';
-      } else if (lastError?.status === 403 || lastError?.apiCode === 'PERMISSION_DENIED') {
-        helpMsg = 'Permission denied. Ensure the Generative Language API is enabled in your Google AI Studio project.';
-      }
-
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
       setDebugResult({
         tested: true,
         success: false,
-        model: selectedModel,
+        model: targetModel,
         latencyMs,
-        error: lastError?.apiCode || 'MODEL_NOT_FOUND',
-        message: lastError?.apiMsg || 'No supported generateContent models responded.',
-        help: helpMsg,
+        error: 'NETWORK_TIMEOUT',
+        message: err.message || 'Request timed out or failed.',
+        help: 'Make sure your browser has internet access.',
       });
+    } finally {
+      setIsTesting(false);
     }
+  };
 
-    setIsTesting(false);
+  const handleTestConnection = async () => {
+    await handleTestSpecificModel(selectedModel);
   };
 
   const localOrigin = window.location.origin;
@@ -193,7 +202,7 @@ export const SettingsModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-      <div className="glass-panel-elevated rounded-3xl max-w-lg w-full p-6 lg:p-7 space-y-5 shadow-2xl relative border border-white">
+      <div className="glass-panel-elevated rounded-3xl max-w-xl w-full p-6 lg:p-7 space-y-5 shadow-2xl relative border border-white max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200/70 pb-3.5">
@@ -226,7 +235,12 @@ export const SettingsModal: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveModalTab('debug')}
+            onClick={() => {
+              setActiveModalTab('debug');
+              if (apiKeyInput.trim() && modelsList.length === 0) {
+                handleFetchAvailableModels();
+              }
+            }}
             className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center space-x-1.5 ${
               activeModalTab === 'debug'
                 ? 'bg-white text-indigo-600 shadow-sm'
@@ -234,7 +248,7 @@ export const SettingsModal: React.FC = () => {
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>API Debugger</span>
+            <span>Model List & Probe</span>
           </button>
 
           <button
@@ -268,17 +282,37 @@ export const SettingsModal: React.FC = () => {
             {/* Model Selector */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
-                <span>Selected LLM Model</span>
-                <span className="text-[10px] text-indigo-600 font-semibold lowercase">free-tier eligible</span>
+                <span>Active Model</span>
+                <button
+                  onClick={() => {
+                    setActiveModalTab('debug');
+                    handleFetchAvailableModels();
+                  }}
+                  className="text-[10px] text-indigo-600 font-bold hover:underline"
+                >
+                  🔍 View All Available Google Models &rarr;
+                </button>
               </label>
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               >
-                <option value="gemini-1.5-flash">gemini-1.5-flash (Fastest & Cheapest — Free Tier)</option>
-                <option value="gemini-2.0-flash">gemini-2.0-flash (Newest Experimental — Free Tier)</option>
-                <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b (Ultra-budget 8B — Free Tier)</option>
+                {modelsList.length > 0 ? (
+                  modelsList.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.displayName})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="gemini-2.0-flash">gemini-2.0-flash (Newest Flash — Free Tier)</option>
+                    <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Experimental)</option>
+                    <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
+                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                    <option value="gemini-pro">gemini-pro</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -317,11 +351,11 @@ export const SettingsModal: React.FC = () => {
                     onClick={() => {
                       handleSaveSettings();
                       setActiveModalTab('debug');
-                      handleTestConnection();
+                      handleFetchAvailableModels();
                     }}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-xl text-xs transition"
                   >
-                    Save & Test &rarr;
+                    List Models &rarr;
                   </button>
                   <button
                     onClick={handleSaveSettings}
@@ -366,41 +400,93 @@ export const SettingsModal: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 2: Live API Connection Debugger */}
+        {/* Tab 2: Model List & Live Probe Debugger */}
         {activeModalTab === 'debug' && (
           <div className="space-y-4 animate-fadeIn">
-            <div className="bg-white/80 border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-xs">
+            
+            {/* ModelService.ListModels Action Card */}
+            <div className="bg-white/90 border border-slate-200/80 rounded-2xl p-4 space-y-3 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Terminal className="w-4 h-4 text-indigo-600" />
-                  <h3 className="text-xs font-bold text-slate-800">Gemini Live Probe Diagnostics</h3>
+                  <h3 className="text-xs font-bold text-slate-900">Google ModelService.ListModels</h3>
                 </div>
                 <button
-                  onClick={handleTestConnection}
-                  disabled={isTesting}
-                  className="flex items-center space-x-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                  onClick={handleFetchAvailableModels}
+                  disabled={isFetchingModels}
+                  className="flex items-center space-x-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
-                  <span>{isTesting ? 'Testing...' : 'Run Probe'}</span>
+                  <RefreshCw className={`w-3 h-3 ${isFetchingModels ? 'animate-spin' : ''}`} />
+                  <span>{isFetchingModels ? 'Querying Google...' : 'Fetch Available Models'}</span>
                 </button>
               </div>
 
-              {/* Status Display */}
-              {!debugResult.tested && !isTesting && (
-                <div className="text-center py-6 text-xs text-slate-400 space-y-1">
-                  <p>Click <strong>Run Probe</strong> to verify your Gemini API key and test latency.</p>
+              {listModelsError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{listModelsError}</span>
                 </div>
               )}
 
-              {isTesting && (
-                <div className="flex items-center justify-center space-x-2 py-6 text-xs text-indigo-600 font-medium">
-                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
-                  <span>Sending live probe to Google Gemini API ({selectedModel})...</span>
+              {/* Models List Table */}
+              {modelsList.length > 0 && (
+                <div className="space-y-2 pt-1 max-h-48 overflow-y-auto pr-1">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    {modelsList.length} Models Available for Your Key:
+                  </p>
+                  {modelsList.map((m) => {
+                    const isCurrent = m.name === selectedModel;
+                    return (
+                      <div
+                        key={m.name}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between transition ${
+                          isCurrent
+                            ? 'bg-indigo-50/80 border-indigo-300 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 hover:bg-white'
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="text-xs font-bold text-slate-900 font-mono">{m.name}</span>
+                            {isCurrent && (
+                              <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.2 rounded-full">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 line-clamp-1">{m.description}</p>
+                        </div>
+
+                        <button
+                          onClick={() => handleTestSpecificModel(m.name)}
+                          disabled={isTesting}
+                          className="bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-bold transition shadow-xs shrink-0"
+                        >
+                          {isTesting && selectedModel === m.name ? 'Testing...' : 'Select & Test'}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
+            </div>
+
+            {/* Test Probe Diagnostics */}
+            <div className="bg-white/90 border border-slate-200/80 rounded-2xl p-4 space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800">Selected Model: <code className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-bold font-mono">{selectedModel}</code></span>
+                <button
+                  onClick={() => handleTestSpecificModel(selectedModel)}
+                  disabled={isTesting}
+                  className="flex items-center space-x-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs hover:opacity-95 transition disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
+                  <span>{isTesting ? 'Probing...' : 'Test Selected Model'}</span>
+                </button>
+              </div>
 
               {debugResult.tested && (
-                <div className="space-y-2.5 pt-1">
+                <div className="pt-2">
                   {debugResult.success ? (
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1.5">
                       <div className="flex items-center justify-between">
@@ -435,23 +521,12 @@ export const SettingsModal: React.FC = () => {
                       <p className="text-xs text-rose-700 font-medium">
                         {debugResult.message}
                       </p>
-                      {debugResult.help && (
-                        <div className="bg-white/90 p-2 rounded-lg border border-rose-100 text-[11px] text-slate-700">
-                          <strong>Troubleshooting:</strong> {debugResult.help}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs space-y-1 text-slate-600">
-              <p className="font-bold text-slate-800">💡 Why Gemini Flash is Recommended:</p>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Google AI Studio provides generous free quotas (15 requests/min) designed specifically for testing without ever entering credit card details.
-              </p>
-            </div>
           </div>
         )}
 
