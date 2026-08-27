@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { format, addDays } from 'date-fns';
 import { UserRole, Task, LearnDoc, ActivityFeedItem, AppSettings } from '../types';
+
 
 interface AppContextType {
   currentUser: UserRole;
@@ -502,48 +504,145 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const generateAiRoadmap = async (prompt: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    const generatedTasks: Task[] = [
-      {
-        id: `task-ai-1-${Date.now()}`,
-        title: `Architecture & Core: ${prompt.slice(0, 26)}`,
-        description: `Define system architecture, WebSocket channels, and SQLite models for: ${prompt}`,
-        assignee: 'Cam',
-        status: 'In Progress',
-        priority: 'High',
-        startDate: today,
-        endDate: today,
-        progress: 25,
-        tags: ['ai-plan', 'backend'],
-        subtasks: [{ id: `sub-ai-1`, title: 'Define data contracts and socket events', completed: true }],
-      },
-      {
-        id: `task-ai-2-${Date.now()}`,
-        title: `Interactive Views: ${prompt.slice(0, 26)}`,
-        description: `Build responsive Apple-style Gantt timeline and drag-and-drop Kanban for: ${prompt}`,
-        assignee: 'Liam',
-        status: 'In Progress',
-        priority: 'Medium',
-        startDate: today,
-        endDate: today,
-        progress: 15,
-        tags: ['ai-plan', 'frontend'],
-        subtasks: [{ id: `sub-ai-2`, title: 'Design Gantt bar calculation', completed: false }],
-      },
-      {
-        id: `task-ai-3-${Date.now()}`,
-        title: `Liquid Glass Polish: ${prompt.slice(0, 26)}`,
-        description: `Implement Apple glass visual tokens, animations, and sound effects for: ${prompt}`,
-        assignee: 'Alex',
-        status: 'Backlog',
-        priority: 'Medium',
-        startDate: today,
-        endDate: today,
-        progress: 0,
-        tags: ['ai-plan', 'design'],
-        subtasks: [{ id: `sub-ai-3`, title: 'Polish frosted backdrops and specular highlights', completed: false }],
-      },
-    ];
+    const baseDate = new Date();
+    let generatedTasks: Task[] = [];
+    const apiKey = (settings.geminiApiKey || '').trim();
+    const model = settings.geminiModel || 'gemini-1.5-flash';
+
+    if (apiKey) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    {
+                      text: `You are an agile software project manager. Decompose project goal: "${prompt}" into 3 or 4 sequential deliverables for Cam (Backend/Architecture), Liam (Frontend/UI), and Alex (Design/QA).
+Respond with a JSON array of objects with the exact schema:
+[
+  {
+    "title": "Phase title",
+    "description": "Brief description of phase deliverables",
+    "assignee": "Cam" | "Liam" | "Alex",
+    "startOffsetDays": 0,
+    "durationDays": 4,
+    "priority": "High" | "Medium" | "Low",
+    "subtasks": ["subtask 1", "subtask 2"]
+  }
+]`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.3,
+                responseMimeType: 'application/json',
+              },
+            }),
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (jsonText) {
+            const parsed = JSON.parse(jsonText);
+            const list = Array.isArray(parsed) ? parsed : parsed.tasks || [];
+            if (list.length > 0) {
+              generatedTasks = list.map((item: any, i: number) => {
+                const startOffset = item.startOffsetDays !== undefined ? Number(item.startOffsetDays) : i * 2;
+                const duration = item.durationDays !== undefined ? Math.max(2, Number(item.durationDays)) : 4;
+                const startDate = format(addDays(baseDate, startOffset), 'yyyy-MM-dd');
+                const endDate = format(addDays(baseDate, startOffset + duration), 'yyyy-MM-dd');
+
+                const assignee: UserRole =
+                  item.assignee === 'Liam' || item.assignee === 'Alex' || item.assignee === 'Cam'
+                    ? item.assignee
+                    : i % 3 === 0
+                    ? 'Cam'
+                    : i % 3 === 1
+                    ? 'Liam'
+                    : 'Alex';
+
+                const subtasks = Array.isArray(item.subtasks)
+                  ? item.subtasks.map((st: any, sIdx: number) => ({
+                      id: `sub-ai-${Date.now()}-${sIdx}`,
+                      title: typeof st === 'string' ? st : st.title || 'Deliverable',
+                      completed: false,
+                    }))
+                  : [];
+
+                return {
+                  id: `task-gemini-${Date.now()}-${i}`,
+                  title: item.title || `Phase ${i + 1}`,
+                  description: item.description || `Deliverables for ${prompt}`,
+                  assignee,
+                  status: (i === 0 ? 'In Progress' : 'Backlog') as any,
+                  priority: (item.priority || 'Medium') as any,
+                  startDate,
+                  endDate,
+                  progress: i === 0 ? 20 : 0,
+                  tags: ['gemini-ai', prompt.slice(0, 12)],
+                  subtasks,
+                };
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[AppContext] Direct Gemini roadmap generation failed, using intelligent fallback:', err);
+      }
+    }
+
+    // Fallback if no key or API failed
+    if (generatedTasks.length === 0) {
+      generatedTasks = [
+        {
+          id: `task-ai-1-${Date.now()}`,
+          title: `Core Architecture: ${prompt.slice(0, 24)}`,
+          description: `Define system architecture, WebSocket channels, and SQLite models for: ${prompt}`,
+          assignee: 'Cam',
+          status: 'In Progress',
+          priority: 'High',
+          startDate: format(baseDate, 'yyyy-MM-dd'),
+          endDate: format(addDays(baseDate, 3), 'yyyy-MM-dd'),
+          progress: 25,
+          tags: ['ai-plan', 'backend'],
+          subtasks: [{ id: `sub-ai-1`, title: 'Define data contracts and socket events', completed: true }],
+        },
+        {
+          id: `task-ai-2-${Date.now()}`,
+          title: `Interactive Views: ${prompt.slice(0, 24)}`,
+          description: `Build responsive Apple-style Gantt timeline and drag-and-drop Kanban for: ${prompt}`,
+          assignee: 'Liam',
+          status: 'In Progress',
+          priority: 'Medium',
+          startDate: format(addDays(baseDate, 1), 'yyyy-MM-dd'),
+          endDate: format(addDays(baseDate, 5), 'yyyy-MM-dd'),
+          progress: 15,
+          tags: ['ai-plan', 'frontend'],
+          subtasks: [{ id: `sub-ai-2`, title: 'Design Gantt bar calculation', completed: false }],
+        },
+        {
+          id: `task-ai-3-${Date.now()}`,
+          title: `Liquid Glass Polish: ${prompt.slice(0, 24)}`,
+          description: `Implement Apple glass visual tokens, animations, and sound effects for: ${prompt}`,
+          assignee: 'Alex',
+          status: 'Backlog',
+          priority: 'Medium',
+          startDate: format(addDays(baseDate, 3), 'yyyy-MM-dd'),
+          endDate: format(addDays(baseDate, 8), 'yyyy-MM-dd'),
+          progress: 0,
+          tags: ['ai-plan', 'design'],
+          subtasks: [{ id: `sub-ai-3`, title: 'Polish frosted backdrops and specular highlights', completed: false }],
+        },
+      ];
+    }
 
     setTasks((prev) => [...prev, ...generatedTasks]);
     setSettings((prev) => ({ ...prev, aiCredits: Math.max(0, prev.aiCredits - 15) }));
@@ -559,7 +658,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           body: JSON.stringify({ ...t, user: currentUser }),
         });
       } catch {
-        // Fallback
+        // Fallback on static hosting
       }
     }
   };
