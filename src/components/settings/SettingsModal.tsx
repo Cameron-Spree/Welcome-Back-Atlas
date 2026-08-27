@@ -11,18 +11,35 @@ interface GeminiModelInfo {
 }
 
 export const SettingsModal: React.FC = () => {
-  const { isSettingsOpen, setIsSettingsOpen, settings, updateSettings, topUpCredits, isConnected } = useApp();
+  const {
+    isSettingsOpen,
+    setIsSettingsOpen,
+    settings,
+    updateSettings,
+    topUpCredits,
+    isConnected,
+    companyProfile,
+    updateCompanyProfile,
+  } = useApp();
   
   // ALL React Hooks at the very top (never after conditional return)
   const [apiKeyInput, setApiKeyInput] = useState(settings.geminiApiKey || '');
   const [selectedModel, setSelectedModel] = useState(settings.geminiModel || 'gemini-1.5-flash');
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [activeModalTab, setActiveModalTab] = useState<'network' | 'ai' | 'debug'>('ai');
+  const [activeModalTab, setActiveModalTab] = useState<'ai' | 'context' | 'debug' | 'network'>('ai');
   const [copiedLink, setCopiedLink] = useState(false);
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
   const [modelsList, setModelsList] = useState<GeminiModelInfo[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [listModelsError, setListModelsError] = useState<string | null>(null);
+
+  // Company Profile Local Edit State
+  const [companyEdit, setCompanyEdit] = useState(companyProfile);
+  const [companySavedSuccess, setCompanySavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setCompanyEdit(companyProfile);
+  }, [companyProfile]);
 
   // Debugger state
   const [isTesting, setIsTesting] = useState(false);
@@ -244,7 +261,19 @@ export const SettingsModal: React.FC = () => {
             }`}
           >
             <Key className="w-3.5 h-3.5" />
-            <span>Gemini AI Key</span>
+            <span>AI Key</span>
+          </button>
+
+          <button
+            onClick={() => setActiveModalTab('context')}
+            className={`flex-1 py-1.5 rounded-lg font-bold transition flex items-center justify-center space-x-1.5 ${
+              activeModalTab === 'context'
+                ? 'bg-black text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-950'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Company DNA</span>
           </button>
 
           <button
@@ -261,7 +290,7 @@ export const SettingsModal: React.FC = () => {
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>Model List &amp; Probe</span>
+            <span>Models</span>
           </button>
 
           <button
@@ -273,9 +302,122 @@ export const SettingsModal: React.FC = () => {
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Multiplayer</span>
+            <span>Network</span>
           </button>
         </div>
+
+        {/* Tab: Company DNA Context */}
+        {activeModalTab === 'context' && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-4 h-4 text-zinc-900" />
+                <h3 className="text-xs font-black text-zinc-950">Atlas Company Knowledge Profile</h3>
+              </div>
+              <p className="text-[11px] text-zinc-600 leading-relaxed font-medium">
+                This high-density context is concisely injected into Gemini (~100 tokens), allowing the AI to customize every roadmap and literature recommendation without exhausting context or token limits.
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-zinc-700 uppercase tracking-wider text-[10px]">Studio Summary &amp; Mission</label>
+                <textarea
+                  rows={2}
+                  value={companyEdit.summary}
+                  onChange={(e) => setCompanyEdit({ ...companyEdit, summary: e.target.value })}
+                  className="w-full glass-input rounded-xl p-2.5 text-xs text-zinc-900 focus:outline-none"
+                  placeholder="What Atlas builds and specializes in..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-zinc-700 uppercase tracking-wider text-[10px]">Target Clients / Audience</label>
+                  <input
+                    type="text"
+                    value={companyEdit.targetAudience}
+                    onChange={(e) => setCompanyEdit({ ...companyEdit, targetAudience: e.target.value })}
+                    className="w-full glass-input rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-zinc-700 uppercase tracking-wider text-[10px]">Tech Stack</label>
+                  <input
+                    type="text"
+                    value={companyEdit.techStack}
+                    onChange={(e) => setCompanyEdit({ ...companyEdit, techStack: e.target.value })}
+                    className="w-full glass-input rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <span className="font-black text-zinc-950 uppercase tracking-wider text-[10px]">Team Member Roles</span>
+                <div className="space-y-2">
+                  <div className="p-2.5 rounded-xl bg-white border border-zinc-200 space-y-1">
+                    <span className="font-extrabold text-zinc-900">Cam (Backend / Systems Architecture):</span>
+                    <input
+                      type="text"
+                      value={companyEdit.teamRoles.cam}
+                      onChange={(e) => setCompanyEdit({
+                        ...companyEdit,
+                        teamRoles: { ...companyEdit.teamRoles, cam: e.target.value }
+                      })}
+                      className="w-full text-xs text-zinc-700 bg-zinc-50 rounded-lg px-2 py-1 border border-zinc-200 focus:outline-none"
+                    />
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white border border-zinc-200 space-y-1">
+                    <span className="font-extrabold text-zinc-900">Liam (Frontend / UI Engineering):</span>
+                    <input
+                      type="text"
+                      value={companyEdit.teamRoles.liam}
+                      onChange={(e) => setCompanyEdit({
+                        ...companyEdit,
+                        teamRoles: { ...companyEdit.teamRoles, liam: e.target.value }
+                      })}
+                      className="w-full text-xs text-zinc-700 bg-zinc-50 rounded-lg px-2 py-1 border border-zinc-200 focus:outline-none"
+                    />
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white border border-zinc-200 space-y-1">
+                    <span className="font-extrabold text-zinc-900">Alex (Design, UX &amp; QA):</span>
+                    <input
+                      type="text"
+                      value={companyEdit.teamRoles.alex}
+                      onChange={(e) => setCompanyEdit({
+                        ...companyEdit,
+                        teamRoles: { ...companyEdit.teamRoles, alex: e.target.value }
+                      })}
+                      className="w-full text-xs text-zinc-700 bg-zinc-50 rounded-lg px-2 py-1 border border-zinc-200 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                {companySavedSuccess ? (
+                  <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4" /> Context updated!
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-zinc-400">Injected into all Gemini sessions</span>
+                )}
+
+                <button
+                  onClick={() => {
+                    updateCompanyProfile(companyEdit);
+                    setCompanySavedSuccess(true);
+                    setTimeout(() => setCompanySavedSuccess(false), 2500);
+                  }}
+                  className="bg-black hover:bg-zinc-800 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm transition"
+                >
+                  Save Company Context
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Tab 1: Gemini AI Key & Free-Tier Models */}
         {activeModalTab === 'ai' && (

@@ -48,10 +48,39 @@ export interface ActivityFeedItem {
   timestamp: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  user?: UserRole;
+  text: string;
+  timestamp: string;
+  plan?: {
+    promptTitle: string;
+    tasks: Task[];
+    docs: LearnDoc[];
+    isCommitted?: boolean;
+  };
+}
+
+export interface CompanyProfile {
+  name: string;
+  industry: string;
+  summary: string;
+  targetAudience: string;
+  currentGoals: string;
+  teamRoles: {
+    cam: string;
+    liam: string;
+    alex: string;
+  };
+  techStack: string;
+}
+
 export interface AppSettings {
   geminiApiKey: string;
   geminiModel?: string;
   aiCredits: number;
   theme: 'dark' | 'light';
+  companyProfile?: CompanyProfile;
 }
 

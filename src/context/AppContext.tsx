@@ -1,8 +1,30 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { format, addDays } from 'date-fns';
-import { UserRole, Task, LearnDoc, ActivityFeedItem, AppSettings } from '../types';
+import { UserRole, Task, LearnDoc, ActivityFeedItem, AppSettings, ChatMessage, CompanyProfile } from '../types';
 
+export const DEFAULT_COMPANY_PROFILE: CompanyProfile = {
+  name: 'Atlas',
+  industry: 'Creative Tech & Digital Product Studio',
+  summary: 'Atlas designs and engineers high-performance web applications, collaborative multiplayer platforms, and AI-enabled product workflows.',
+  targetAudience: 'Modern founders, high-velocity creative teams, and clients seeking bespoke web technology.',
+  currentGoals: 'Beta test AI-powered roadmap planning, ship client deliverables rapidly, and maintain real-time collaborative velocity.',
+  teamRoles: {
+    cam: 'Lead Architecture & Backend Engineering (APIs, SQLite/Postgres schemas, WebSockets, AI pipelines).',
+    liam: 'Lead Frontend Engineering (React, TypeScript, Tailwind CSS, Gantt timeline roadmaps, UI micro-interactions).',
+    alex: 'Design Director & QA/Strategy Lead (Design systems, UI/UX polish, social media asset kits, user flows).',
+  },
+  techStack: 'React 18, TypeScript, Tailwind CSS (Apple Liquid Glass), WebSockets, Google Gemini LLM API',
+};
+
+const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
+  {
+    id: 'msg-welcome',
+    sender: 'assistant',
+    text: "Welcome back! I'm Atlas Gemini AI — loaded with your company context for Cam (Backend), Liam (Frontend), and Alex (Design/QA). What would you like to build, plan, or brainstorm today?",
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  },
+];
 
 interface AppContextType {
   currentUser: UserRole;
@@ -32,6 +54,11 @@ interface AppContextType {
   isConnected: boolean;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  chatMessages: ChatMessage[];
+  sendChatMessage: (text: string) => Promise<void>;
+  clearChatHistory: () => void;
+  companyProfile: CompanyProfile;
+  updateCompanyProfile: (profile: Partial<CompanyProfile>) => void;
 }
 
 const INITIAL_TASKS: Task[] = [
@@ -259,6 +286,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [activities, setActivities] = useState<ActivityFeedItem[]>(INITIAL_ACTIVITIES);
 
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => {
+    try {
+      const saved = localStorage.getItem('atlas_company_profile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.name) return { ...DEFAULT_COMPANY_PROFILE, ...parsed };
+      }
+    } catch {}
+    return DEFAULT_COMPANY_PROFILE;
+  });
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('atlas_chat_messages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_CHAT_MESSAGES;
+  });
+
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem('atlas_app_settings');
@@ -268,7 +317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
     const savedKey = typeof window !== 'undefined' ? localStorage.getItem('atlas_gemini_api_key') || '' : '';
     const savedModel = typeof window !== 'undefined' ? localStorage.getItem('atlas_gemini_model') || 'gemini-flash-latest' : 'gemini-flash-latest';
-    return { geminiApiKey: savedKey, geminiModel: savedModel, aiCredits: 100, theme: 'light' };
+    return { geminiApiKey: savedKey, geminiModel: savedModel, aiCredits: 100, theme: 'light', companyProfile: DEFAULT_COMPANY_PROFILE };
   });
 
   const [activeTab, setActiveTab] = useState<'home' | 'learn' | 'projects' | 'progress'>('home');
@@ -1032,6 +1081,76 @@ Respond with a JSON array of objects with the exact schema:
     await updateSettings({ aiCredits: newAmount });
   };
 
+  const updateCompanyProfile = (profileUpdates: Partial<CompanyProfile>) => {
+    setCompanyProfile((prev) => {
+      const updated = { ...prev, ...profileUpdates };
+      try { localStorage.setItem('atlas_company_profile', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const clearChatHistory = () => {
+    setChatMessages(INITIAL_CHAT_MESSAGES);
+    try { localStorage.setItem('atlas_chat_messages', JSON.stringify(INITIAL_CHAT_MESSAGES)); } catch {}
+  };
+
+  const sendChatMessage = async (text: string) => {
+    if (!text.trim()) return;
+
+    const userMsg: ChatMessage = {
+      id: `msg-user-${Date.now()}`,
+      sender: 'user',
+      user: currentUser,
+      text: text.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const currentHistory = [...chatMessages, userMsg];
+    setChatMessages(currentHistory);
+    try { localStorage.setItem('atlas_chat_messages', JSON.stringify(currentHistory)); } catch {}
+
+    // Find latest active plan in conversation if any to refine
+    const previousPlanMsg = [...chatMessages].reverse().find((m) => m.plan && !m.plan.isCommitted);
+    const existingPlanContext = previousPlanMsg?.plan
+      ? `\nPREVIOUS DRAFT PLAN:\n${JSON.stringify(previousPlanMsg.plan.tasks.map(t => ({ title: t.title, assignee: t.assignee, days: `${t.startDate} to ${t.endDate}`, subtasks: t.subtasks?.map(s => s.title) })))}`
+      : '';
+
+    const companyContext = `[Atlas Company Context: Studio: ${companyProfile.name} (${companyProfile.industry}). Purpose: ${companyProfile.summary}. Team: Cam (${companyProfile.teamRoles.cam}), Liam (${companyProfile.teamRoles.liam}), Alex (${companyProfile.teamRoles.alex}). Tech Stack: ${companyProfile.techStack}. Strategic Goals: ${companyProfile.currentGoals}]`;
+
+    try {
+      const plan = await generatePlanWithGuides(
+        `${companyContext}${existingPlanContext}\nUser Instruction: "${text.trim()}". If the user is refining or querying the plan, update the deliverables and literature accordingly.`
+      );
+
+      const assistantMsg: ChatMessage = {
+        id: `msg-ai-${Date.now()}`,
+        sender: 'assistant',
+        text: `I've updated the roadmap and learning literature based on your request. Review the deliverables below or probe further:`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        plan: {
+          promptTitle: text.trim(),
+          tasks: plan.tasks,
+          docs: plan.docs,
+          isCommitted: false,
+        },
+      };
+
+      const finalHistory = [...currentHistory, assistantMsg];
+      setChatMessages(finalHistory);
+      try { localStorage.setItem('atlas_chat_messages', JSON.stringify(finalHistory)); } catch {}
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        id: `msg-ai-err-${Date.now()}`,
+        sender: 'assistant',
+        text: `I encountered an issue generating your plan: ${err.message || 'Unknown error'}. Please try again.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      const finalHistory = [...currentHistory, errorMsg];
+      setChatMessages(finalHistory);
+      try { localStorage.setItem('atlas_chat_messages', JSON.stringify(finalHistory)); } catch {}
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1062,6 +1181,11 @@ Respond with a JSON array of objects with the exact schema:
         isConnected,
         searchQuery,
         setSearchQuery,
+        chatMessages,
+        sendChatMessage,
+        clearChatHistory,
+        companyProfile,
+        updateCompanyProfile,
       }}
     >
       {children}
