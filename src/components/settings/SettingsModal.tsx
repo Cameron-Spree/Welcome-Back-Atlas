@@ -9,6 +9,7 @@ export const SettingsModal: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeModalTab, setActiveModalTab] = useState<'network' | 'ai' | 'debug'>('ai');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
 
   // Debugger state
   const [isTesting, setIsTesting] = useState(false);
@@ -33,8 +34,6 @@ export const SettingsModal: React.FC = () => {
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
-
-  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
 
   const handleTestConnection = async () => {
     const key = apiKeyInput.trim();
