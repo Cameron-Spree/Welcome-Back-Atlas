@@ -35,6 +35,97 @@ export class AIService {
     return null;
   }
 
+  public getModel(): string {
+    const dbModel = settingsRepository.getSetting<string>('gemini_model');
+    if (dbModel && typeof dbModel === 'string' && dbModel.trim().length > 0) {
+      return dbModel.trim();
+    }
+    return 'gemini-1.5-flash';
+  }
+
+  public async testConnection(customKey?: string, modelOverride?: string) {
+    const apiKey = customKey?.trim() || this.getApiKey();
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'NO_API_KEY',
+        message: 'No API key provided. Please enter a Google Gemini API key from Google AI Studio.',
+      };
+    }
+
+    const model = modelOverride?.trim() || this.getModel();
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: 'Respond with exactly: {"status": "ok", "message": "connected"}' }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+            },
+          }),
+        }
+      );
+
+      const latencyMs = Date.now() - startTime;
+
+      if (!response.ok) {
+        let errorData: any = {};
+        try {
+          errorData = await response.json();
+        } catch {}
+        const errorMsg = errorData.error?.message || response.statusText;
+        const errorCode = errorData.error?.status || `HTTP_${response.status}`;
+
+        return {
+          success: false,
+          error: errorCode,
+          message: errorMsg || `HTTP error ${response.status}`,
+          model,
+          latencyMs,
+          status: response.status,
+          help:
+            response.status === 400 || errorCode === 'INVALID_ARGUMENT'
+              ? 'API Key is invalid or expired. Please generate a fresh key at aistudio.google.com.'
+              : response.status === 429
+              ? 'Rate limit reached on free tier. Wait a minute or check your quota.'
+              : 'Check that Gemini API is enabled in your Google AI Studio console.',
+        };
+      }
+
+      const resData = await response.json();
+      const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+
+      return {
+        success: true,
+        model,
+        latencyMs,
+        message: `Connected successfully to Google Gemini (${model})! 100% Free-tier eligible.`,
+        preview: rawText,
+      };
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      return {
+        success: false,
+        error: 'NETWORK_ERROR',
+        message: err.message || 'Failed to reach Google Gemini API endpoint.',
+        model,
+        latencyMs,
+        help: 'Ensure your server has internet access to https://generativelanguage.googleapis.com.',
+      };
+    }
+  }
+
   private logPromptHistory(
     userId: string,
     type: string,
@@ -67,11 +158,12 @@ export class AIService {
     let generatedData: any = null;
     let usedFallback = false;
     const apiKey = this.getApiKey();
+    const model = this.getModel();
 
     if (apiKey) {
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -189,11 +281,12 @@ export class AIService {
     let generatedTasksData: any[] = [];
     let usedFallback = false;
     const apiKey = this.getApiKey();
+    const model = this.getModel();
 
     if (apiKey) {
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

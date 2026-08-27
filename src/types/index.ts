@@ -50,6 +50,8 @@ export interface ActivityFeedItem {
 
 export interface AppSettings {
   geminiApiKey: string;
+  geminiModel?: string;
   aiCredits: number;
   theme: 'dark' | 'light';
 }
+

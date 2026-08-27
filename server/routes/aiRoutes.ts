@@ -90,4 +90,15 @@ aiRouter.post('/generate-roadmap', async (req: Request, res: Response, next: Nex
   }
 });
 
+// POST /api/ai/test-connection (Test probe Gemini API key and model)
+aiRouter.post('/test-connection', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { apiKey, model } = req.body;
+    const result = await aiService.testConnection(apiKey, model);
+    res.json(result);
+  } catch (err: any) {
+    next(err);
+  }
+});
+
 export default aiRouter;
