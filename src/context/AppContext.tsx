@@ -822,33 +822,53 @@ Respond with a JSON array of objects with the exact schema:
                     role: 'user',
                     parts: [
                       {
-                        text: `You are an expert strategist and technical product lead for Atlas Studios UK.
-Decompose the project goal: "${prompt}" into 3 or 4 sequential, highly actionable phases for team members Cam (Backend & Architecture), Liam (Frontend & Mobile Apps), and Alex (Design Director & Brand/QA).
+                        text: `You are the Lead Strategist & Execution Director for Atlas Studios UK ("Making the internet less boring" — Creators of Atlas Tools SaaS and atmospheric iOS apps like Veritas & Little Linguist).
+
+The user wants to execute: "${prompt}".
+
+TEAM CAPABILITIES (All members use advanced AI subscriptions for coding & copywriting — DO NOT write verbose code templates or generic fluff. Instead, PROMPT THE EXACT HIGH-LEVERAGE ACTIONS THEY SHOULD TAKE):
+- Cam (Backend & Systems Architect): APIs, automation scripts, scrapers, webhook queues, database schemas, technical dev blogs.
+- Liam (Frontend & App Engineer): Fluid Next.js interfaces, interactive demos, App Store mobile app updates, UI animations.
+- Alex (Design Director & Brand/QA Lead): Visual asset kits (Figma), video reels, App Store screenshots, content calendars, brand tone, QA testing.
 
 CRITICAL INSTRUCTIONS:
-1. DOMAIN ACCURACY: If the goal is about social media, branding, marketing, content creation, or business operations, DO NOT invent complex database/software builds unless the user specifically asked for custom software. Instead, assign genuine marketing/brand execution:
-   - Alex (Design/Brand): Visual templates in Figma, brand voice & tone guidelines, video showcase clips, content calendar cadence.
-   - Cam (Tech/Lead): Social media automated scheduling tooling (Buffer/Typefully/APIs), analytics metrics, technical engineering blog writeups.
-   - Liam (Frontend/Apps): Interactive product demos, interactive web showcases of Atlas Tools/apps (Veritas, Little Linguist), case study launch pages.
-2. TIMELINE: Start each phase sequentially (offset 0, offset +4, etc.), assigning priority and concise key deliverables.
-3. LEARNING GUIDES: For EACH phase, provide curated literature and guides so the assigned person knows what to do and read up on.
+1. ACTION-ORIENTED BREAKDOWN:
+   - Provide 3 to 4 sequential, punchy phases with specific high-leverage deliverables.
+   - For marketing, social media, or blogs: DO NOT invent unnecessary SQL databases. Focus on real marketing execution (Ahrefs keyword mapping, Figma templates, video demos of Atlas Tools, distribution hooks).
+2. GOLD-STANDARD INDUSTRY LITERATURE & REAL REFERENCES:
+   - For EACH phase, attach authoritative industry learning guides and genuine reference URLs from industry leaders:
+     * SEO / Content / Blogs: Ahrefs Blog (e.g., ahrefs.com/blog), Backlinko, Marketing Examples (marketingexamples.com), Google Search Central.
+     * UI / UX / Atmosphere: Apple Human Interface Guidelines (developer.apple.com/design), Refactoring UI, Mobbin.
+     * Mobile Apps: Apple Developer Docs, SwiftUI by Example (hackingwithswift.com), App Store Optimization (ASO).
+     * Backend / Architecture: Stripe Engineering Blog, Vercel Docs (nextjs.org/docs), Cloudflare Docs.
+3. EXECUTIVE ACTION BRIEF FORMAT IN LITERATURE:
+   The "markdownContent" in the literature MUST be structured cleanly:
+   # [Action-Oriented Title]
+   ## 🎯 Objective & Strategic Context
+   Brief, sharp explanation of why this matters for Atlas.
+   ## ⚡ Step-by-Step Execution Plan
+   Direct, numbered action items for the assignee.
+   ## 🤖 Heavy-Lifting AI Prompt (Copy-Paste Ready)
+   A pre-crafted, high-density prompt the assignee can paste into Claude/ChatGPT/Cursor to generate the work instantly.
+   ## 📚 Curated Industry Reading
+   Key takeaways from premier blogs (Ahrefs, Apple HIG, Stripe, etc.).
 
 Respond with a JSON array of objects with the exact schema:
 [
   {
-    "title": "Phase title",
-    "description": "Deliverable description",
+    "title": "Action-oriented Phase Title",
+    "description": "Crisp summary of the phase objective",
     "assignee": "Cam" | "Liam" | "Alex",
     "startOffsetDays": 0,
     "durationDays": 4,
     "priority": "High" | "Medium" | "Low",
-    "subtasks": ["Deliverable 1", "Deliverable 2"],
+    "subtasks": ["Specific Action 1", "Specific Action 2", "Specific Action 3"],
     "literature": {
-      "guideTitle": "Guide title for assigned person",
-      "summary": "Why this literature is essential for this task",
-      "markdownContent": "# Title\\n\\n## Overview & Execution Strategy\\nDetailed explanation...\\n\\n### Key Steps\\n1. Step 1\\n2. Step 2",
+      "guideTitle": "Authoritative Guide Title",
+      "summary": "Why this literature gives the team an unfair advantage",
+      "markdownContent": "# Title\\n\\n## 🎯 Objective...\\n\\n## ⚡ Execution Plan...\\n\\n## 🤖 AI Prompt Starter...\\n\\n## 📚 Industry References...",
       "resources": [
-        { "title": "Reference Doc / Article", "url": "https://developer.mozilla.org", "type": "doc" }
+        { "title": "Ahrefs / Apple / Stripe Guide Title", "url": "https://ahrefs.com/blog/...", "type": "article" }
       ]
     }
   }
@@ -858,7 +878,7 @@ Respond with a JSON array of objects with the exact schema:
                   },
                 ],
                 generationConfig: {
-                  temperature: 0.3,
+                  temperature: 0.25,
                   responseMimeType: 'application/json',
                 },
               }),
