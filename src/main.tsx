@@ -17,7 +17,7 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('App ErrorBoundary caught error:', error, errorInfo);
+    console.error('Atlas ErrorBoundary caught error:', error, errorInfo);
   }
 
   render() {
@@ -30,16 +30,19 @@ class ErrorBoundary extends React.Component<
             </div>
             <h1 className="text-xl font-black text-zinc-950">Atlas Workspace Notice</h1>
             <p className="text-xs text-zinc-600">
-              An unexpected display exception occurred: {this.state.error?.message || 'Unknown error'}
+              {this.state.error?.message || 'Display initialization refreshed.'}
             </p>
             <button
               onClick={() => {
-                localStorage.clear();
-                window.location.reload();
+                try {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                } catch {}
+                window.location.href = window.location.origin + window.location.pathname;
               }}
-              className="px-4 py-2 bg-black text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition"
+              className="px-5 py-2.5 bg-black text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition shadow-md"
             >
-              Reset Cache & Reload
+              Reset Session & Reload
             </button>
           </div>
         </div>
