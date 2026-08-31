@@ -180,6 +180,8 @@ const BACKEND_URL =
 
 const API_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
 
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
 // Bidirectional Schema Normalizers
 function normalizeUserRole(raw: any): UserRole {
   if (!raw) return 'Cam';
