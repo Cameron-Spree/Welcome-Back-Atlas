@@ -170,9 +170,15 @@ const INITIAL_ACTIVITIES: ActivityFeedItem[] = [
   { id: 'act-3', user: 'Alex', action: 'designed cyber theme tokens for', target: 'UI Components', timestamp: '12 mins ago' },
 ];
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const RENDER_BACKEND_URL = 'https://welcome-back-atlas-backend.onrender.com';
 
-const API_BASE = '/api';
+const BACKEND_URL =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? ''
+    : (import.meta.env.VITE_BACKEND_URL || RENDER_BACKEND_URL);
+
+const API_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
 
 // Bidirectional Schema Normalizers
 function normalizeUserRole(raw: any): UserRole {
@@ -376,9 +382,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchData();
 
     try {
-      const socket: Socket = io(window.location.origin, {
+      const socketUrl = BACKEND_URL || window.location.origin;
+      const socket: Socket = io(socketUrl, {
         transports: ['websocket', 'polling'],
-        timeout: 5000,
+        timeout: 8000,
         reconnection: true,
       });
       setSocketInstance(socket);

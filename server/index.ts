@@ -67,7 +67,19 @@ export function createServerApp() {
     });
   }
 
-  // 5. Health check endpoint
+  // 5. Health check & Root status endpoints
+  app.get('/', (req: Request, res: Response) => {
+    res.json({
+      app: 'Welcome Back Atlas — Real-Time Collaborative API',
+      status: 'online',
+      users: ['Cam', 'Liam', 'Alex'],
+      version: '1.0.0',
+      websockets: 'active',
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   app.get('/health', (req: Request, res: Response) => {
     res.json({
       status: 'healthy',
